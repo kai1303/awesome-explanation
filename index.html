@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>LSM Tree Explainer</title></head>
+<body>
+<header><h1>LSM Tree <em>Explainer</em></h1>
+<form id="command"><label>Operation<select id="op"><option value="write">Write</option><option value="read">Read</option><option value="flush">Flush</option><option value="compact">Compact</option></select></label><label id="keyLabel">Key<input id="key" value="cedar" maxlength="36" required></label><label id="valueLabel">Value<input id="value" value="teal" maxlength="48" required></label><button id="run">Run write <span aria-hidden="true">→</span></button></form><button id="reset">Reset example</button></header>
+<main><div class="chartbar"><div><strong>Record flow</strong><span>Follow a key across the engine.</span></div><div class="legend"><span class="log">WAL</span><span class="ram">Memory</span><span class="file">Disk</span><span class="winner">Visible</span></div></div>
+<div id="viewport" tabindex="0" aria-label="Scrollable record flow diagram"><div id="chart"><svg id="wires" aria-hidden="true"><defs></defs><g></g></svg></div></div>
+<div class="footline"><span id="instruction">Hover or focus a record to trace its key. Select a stage to expand it.</span><div id="paging" hidden><button id="prev" aria-label="Previous keys">‹</button><span id="page"></span><button id="next" aria-label="Next keys">›</button></div></div>
+<section class="notes"><div><h2 id="noteTitle">Reading the diagram</h2><p id="noteBody">Each ribbon follows one record version. The log preserves arrival order, the memtable sorts by key, and a read returns the first matching version from memory or disk.</p><p class="see">Chart adapted from <a href="https://github.com/poloclub/transformer-explainer">Transformer Explainer</a> · <a href="./transformer-explainer-LICENSE.txt">MIT license</a></p></div><div><h2>Operation trace</h2><ol id="events" aria-live="polite"></ol></div></section></main>
+<script type="module" src="./main.js"></script></body></html>

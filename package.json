@@ -1,0 +1,17 @@
+{
+  "name": "storage-engine-explainer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "test": "node --test engine.test.js"
+  },
+  "dependencies": {
+    "d3-selection": "^3.0.1",
+    "gsap": "3.15.1"
+  },
+  "devDependencies": {
+    "vite": "^7.3.0"
+  }
+}
