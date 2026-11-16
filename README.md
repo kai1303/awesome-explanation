@@ -1,5 +1,7 @@
 # Awesome Explanation
 
+**[Explore the live diagram](https://kai1303.github.io/awesome-explanation/)**
+
 Awesome Explanation is growing into one connected, interactive diagram of how things work. The first part is a log-structured merge tree (LSM tree). You can already follow a single write from memory to disk and see how a later read finds it.
 
 As the diagram grows, a concept in one explanation can become the entry point to another. Follow a write into the log, for example, and a natural next question is “What survives a crash?” A future explanation of crash recovery could connect that same log to a filesystem journal. The aim is to let questions like this take you across topics, wherever you started.
