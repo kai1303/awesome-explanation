@@ -2,10 +2,10 @@ import { recordValue } from '../engine.js';
 import { newestVersion } from '../compaction-planner.js';
 import React, { useLayoutEffect, useRef } from 'react';
 import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
+import { StagePopover } from '../../../design-system/inspectors.jsx';
 
-const seqLabel = record => '#' + String(record.seq).padStart(2, '0');
-const version = record => seqLabel(record) + ' · ' + recordValue(record);
+const seqLabel = seq => '#' + String(seq).padStart(2, '0');
+const version = record => seqLabel(record.seq) + ' · ' + recordValue(record);
 
 function Entry({ label, children, selected }) {
   return <div className={'inspection-entry' + (selected ? ' selected' : '')}>
@@ -33,25 +33,37 @@ function Writes({ engine, stage, keyName, selectedSeq }) {
   </>;
 }
 
-function ReadDetails({ stage, engine, keyName, lookup, sourceName, selectSource }) {
+function readContext(stage, engine, keyName, lookup, sourceName) {
   const sources = [
     {name:'RAM', record:engine.memory.get(keyName), count:engine.memory.size},
     ...engine.tables.map(table => ({name:table.name, record:table.rows.find(r => r.key === keyName), count:table.rows.length}))
   ];
+  const trace = lookup?.key === keyName ? lookup : null;
+  const winner = trace ? trace.winner : newestVersion(sources.map(s => s.record));
+  const lastChecked = trace && [...trace.checked].at(-1);
+  const selected = sources.find(s => s.name === sourceName) ??
+    (stage === 'lookup' ? sources.find(s => s.name === lastChecked) ?? sources[0] : null);
+  return {sources, trace, winner, selected};
+}
+
+function ReadDetails({ stage, engine, keyName, context, selectSource }) {
+  const {sources, trace, winner, selected} = context;
+  const owner = winner && sources.find(s => s.record === winner);
   const offline = engine.status !== 'online';
   if (offline && stage !== 'sources') return <p>{engine.status === 'crashed'
     ? 'The engine is offline. Restart it to rebuild the memtable from the surviving WAL.'
     : 'Recovery is replaying the WAL. Reads resume when the memtable is rebuilt.'}</p>;
 
-  const trace = lookup?.key === keyName ? lookup : null;
-  const winner = trace ? trace.winner : newestVersion(sources.map(s => s.record));
-  const owner = winner && sources.find(s => s.record === winner);
-  const lastChecked = trace && [...trace.checked].at(-1);
-  const selected = sources.find(s => s.name === sourceName) ??
-    (stage === 'lookup' ? sources.find(s => s.name === lastChecked) ?? sources[0] : null);
   let explanation;
   if (stage === 'sources') {
-    explanation = 'RAM keeps one value per key. Each immutable file keeps its own sorted batch, so a key can appear in several places.';
+    if (engine.status === 'crashed') {
+      const entry = engine.log.findLast(record => record.key === keyName);
+      explanation = entry
+        ? 'The crash cleared the memtable. Restart will replay the WAL through ' + version(entry) + ' for ' + keyName + '.'
+        : 'The crash cleared the memtable. The WAL has no entry to replay for ' + keyName + '.';
+    } else if (engine.status === 'recovering') {
+      explanation = 'Restart is rebuilding the memtable in WAL sequence order. Reads resume after the last entry.';
+    } else explanation = 'RAM keeps one value per key. Each immutable file keeps its own sorted batch, so a key can appear in several places.';
   } else if (stage === 'output') {
     explanation = winner?.operation === 'delete' ? 'The highest sequence is a tombstone. Reads return Not found even if older files still hold a value.' : winner ? 'The highest write sequence supplies the visible value. The engine can return it even while an older version remains on disk.'
       : trace && !trace.complete ? 'The engine is still looking for a version to return.' : 'Every available source lacks this key.';
@@ -62,7 +74,7 @@ function ReadDetails({ stage, engine, keyName, lookup, sourceName, selectSource 
     } else {
       let decision;
       if (winner?.operation === 'delete') decision = 'Return Not found. The newest version is a tombstone in ' + owner.name + '.';
-      else if (winner) decision = 'Return “' + winner.value + '” ' + seqLabel(winner) + ' from ' + owner.name + '. No remaining file can supply a newer version.';
+      else if (winner) decision = 'Return “' + winner.value + '” ' + seqLabel(winner.seq) + ' from ' + owner.name + '. No remaining file can supply a newer version.';
       else if (next) decision = trace.checked.size ? (trace.candidate ? 'Best match so far is ' + version(trace.candidate) + '. ' : 'No match so far. ') + 'Next check ' + next.name + '.' : 'Start with the memtable in RAM.';
       else decision = trace.complete ? 'Key not found. All sources ruled out this key.' : 'All sources ruled out this key. The engine can now report the key as absent.';
       explanation = trace.checked.size + ' of ' + sources.length + ' sources checked. ' + decision;
@@ -72,7 +84,7 @@ function ReadDetails({ stage, engine, keyName, lookup, sourceName, selectSource 
   return <>
     <p>{explanation}</p>
     {stage === 'output' && <p className="inspection-result">{winner
-      ? (winner.operation === 'delete' ? keyName + ' · Not found' : keyName + ' = ' + winner.value) + ' · ' + seqLabel(winner) + ' from ' + owner.name
+      ? (winner.operation === 'delete' ? keyName + ' · Not found' : keyName + ' = ' + winner.value) + ' · ' + seqLabel(winner.seq) + ' from ' + owner.name
       : trace && !trace.complete ? 'Awaiting result' : 'Not found'}</p>}
     <dl>{sources.map(({name, record}) => {
       let status = record ? version(record) : 'Absent';
@@ -100,40 +112,31 @@ function ReadDetails({ stage, engine, keyName, lookup, sourceName, selectSource 
   </>;
 }
 
-export function InspectionCard({ title, titleId, heading, close, wide, children }) {
-  return <Card className={'stage-inspector' + (wide ? ' operation-inspector' : '')}
-      padding={4} role="dialog" aria-labelledby={titleId}>
-    <div className="inspection-heading">
-      <h2 id={titleId} tabIndex={-1} ref={heading}>{title}</h2>
-      <Button label="Close" size="sm" variant="ghost" onClick={close} />
-    </div>
-    {children}
-  </Card>;
-}
+const chartControls = '.column, header, #policy-controls, #maintenance-playback, #lesson, #paging, [role=listbox], [role=option]';
 
 // Keep the SVG and its playback controls mounted as the popover opens and closes.
-export function OperationInspector({ title, panel, close }) {
+export function OperationInspector({ title, panel, close, open }) {
   const body = useRef(null);
   useLayoutEffect(() => { body.current.append(panel); }, [panel]);
-  return <InspectionCard wide title={title} titleId={panel.id + '-title'} close={close}>
-    <div ref={body} className="inspection-content" />
-  </InspectionCard>;
+  return <StagePopover id={panel.id + '-inspector'} title={title} wide open={open} keepOpen={chartControls} onDismiss={close}>
+    <div ref={body} />
+  </StagePopover>;
 }
 
-export function StageInspector({ stage, title, selection, engine, lookup, step, close, selectSource }) {
-  const heading = useRef(null);
-  useLayoutEffect(() => {
-    if (stage) heading.current?.focus({preventScroll:true});
-  }, [stage, selection?.anchor]);
+export function StageInspector({ stage, title, selection, engine, lookup, step, defaultKey, close, selectSource }) {
   if (!stage) return null;
-  const keyName = selection?.key ?? lookup?.key ?? step?.key ?? 'cedar';
-  return <InspectionCard title={title} titleId="inspection-title" heading={heading} close={close}>
-    <div className="inspection-content">
-      <h3>{keyName}</h3>
-      {stage === 'history' || stage === 'route'
-        ? <Writes engine={engine} stage={stage} keyName={keyName} selectedSeq={selection?.seq} />
-        : <ReadDetails stage={stage} engine={engine} keyName={keyName} lookup={lookup}
-            sourceName={selection?.source} selectSource={selectSource} />}
-    </div>
-  </InspectionCard>;
+  const keyName = selection?.key ?? lookup?.key ?? step?.key ?? defaultKey;
+  const writes = stage === 'history' || stage === 'route';
+  const context = writes ? null : readContext(stage, engine, keyName, lookup, selection?.source);
+  const record = writes ? engine.history.findLast(row => row.key === keyName)
+    : context.selected ? context.selected.record : context.winner;
+  const seq = selection?.seq ?? record?.seq;
+  const subtitle = seq == null ? keyName : keyName + ' ' + seqLabel(seq);
+  return <StagePopover id="lsm-stage-detail" title={title} subtitle={subtitle}
+    focusKey={selection?.anchor} keepOpen={chartControls} onDismiss={close}>
+    {writes
+      ? <Writes engine={engine} stage={stage} keyName={keyName} selectedSeq={seq} />
+      : <ReadDetails stage={stage} engine={engine} keyName={keyName} context={context}
+          selectSource={source => selectSource(source, keyName)} />}
+  </StagePopover>;
 }

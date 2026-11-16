@@ -6,6 +6,7 @@ import { KeyPaging, mountControl } from '../controls.jsx';
 // Ribbon geometry and measured DOM anchors adapted from Polo Club's
 // Transformer Explainer, Sankey.svelte. See public/transformer-explainer-LICENSE.txt.
 import { OperationInspector, StageInspector } from './stage-inspector.jsx';
+import { writeTransfer } from './write-path.jsx';
 import { flushView } from './flush.js';
 import { compactionView } from './compaction.js';
 import { select } from 'd3-selection';
@@ -54,7 +55,7 @@ export function recordChart(root, onInspect, openBloom) {
     const body = element('div','column-body');
     body.id = 'body-'+id;
     col.addEventListener('click', event => {
-      if (event.target.closest('button, .operation-toggle, .operation-panel, .heading')) return;
+      if (event.target.closest('button, .operation-toggle, .operation-panel, .heading, .write-path-detail')) return;
       openAt(id, event.target);
     });
     body.addEventListener('keydown', event => {
@@ -65,6 +66,33 @@ export function recordChart(root, onInspect, openBloom) {
     col.append(head,element('p','subtitle',subtitle),body);
     root.append(col);
     columns[id]={col,head,body,renderHead};
+  }
+
+  const writeHost = element('div', 'write-path-detail');
+  writeHost.id = 'write-path-detail';
+  writeHost.hidden = true;
+  columns.route.body.before(writeHost);
+  const transferView = writeTransfer(root, writeHost);
+  const walReplay = writeTransfer(root);
+  let crashFade;
+
+  function fadeMemtable(rows) {
+    if (!rows.length) return;
+    const empty = columns.sources.body.querySelector('.ram .empty');
+    empty.hidden = true;
+    for (const row of rows) {
+      row.inert = true;
+      row.removeAttribute('data-anchor');
+      empty.before(row);
+    }
+    crashFade = gsap.timeline()
+      .to(rows, {opacity:0, duration:.9, delay:.35})
+      .call(() => {
+        rows.forEach(row => row.remove());
+        empty.hidden = false;
+        wires();
+      });
+    return crashFade;
   }
 
   const client = root.querySelector('#sandbox-controls');
@@ -135,7 +163,15 @@ export function recordChart(root, onInspect, openBloom) {
     maintenanceFrame.querySelector('strong').textContent = [title,phaseNames[operation][phase]].filter(Boolean).join(' · ');
     const inputs = plan?.output && plan.inputs.map(t=>t.name).join(' + ') + ' → ' + plan.output.name + '.';
     const reason = plan && trigger && phase === 'compare' ? 'Automatic compaction.' : trigger;
-    maintenanceFrame.querySelector('span').textContent = [reason, inputs, text].filter(Boolean).join(' ');
+    const duplicate = plan?.groups.find(g => g.key === 'juniper' && g.versions.length > 1)
+      ?? plan?.groups.find(g => g.versions.length > 1);
+    let decision;
+    if (duplicate && plan.output) {
+      const [winner,...older] = duplicate.versions;
+      const describe = row => fmtSeq(row.seq) + ' ' + recordValue(row);
+      decision = duplicate.key + ': kept ' + describe(winner) + ', dropped ' + older.map(describe).join(', ') + '.';
+    }
+    maintenanceFrame.querySelector('span').textContent = [reason, inputs, text, decision].filter(Boolean).join(' ');
   }
 
   function markGroup(group, label) {
@@ -143,41 +179,69 @@ export function recordChart(root, onInspect, openBloom) {
     group.append(element('span','maintenance-label',label));
   }
 
-  // Copy the visible winning records from their previous positions into the installed file.
-  function captureInputs(step) {
-    const positions = new Map();
-    if (step?.phase !== 'install' || step.operation !== maintenance?.operation ||
-        !['compare','freeze'].includes(maintenance.phase) || reduced()) return positions;
-    for (const r of step.flush?.output?.rows ?? step.plan.output.rows) {
-      const source = anchors.get((step.flush ? 'm' : 'd') + r.seq);
-      if (source) positions.set(r.seq, source.getBoundingClientRect());
+  // Compaction replaces its input files during install. Keep only their row positions.
+  function captureMergeOrigins(step) {
+    const origins = new Map();
+    if (reduced() || step?.operation !== 'compact' || step.phase !== 'install' || maintenance?.phase !== 'compare') return origins;
+    for (const record of step.plan.output.rows) {
+      const row = anchors.get('d'+record.seq);
+      if (row) origins.set(record.seq, {box:row.getBoundingClientRect(), file:row.closest('[data-source]').dataset.source});
     }
-    return positions;
+    return origins;
   }
   let installTimeline;
   const transfer = element('small','transfer-status');
   maintenanceFrame.append(transfer);
 
-  function animateInstall(positions) {
-    if (!positions.size) return;
+  function animateInstall(origins, flushInstall) {
+    if (!flushInstall && !origins.size) return;
     const output = maintenance.flush?.output ?? maintenance.plan.output;
-    const sources = new Map(maintenance.plan?.inputs.flatMap(t => t.rows.map(r => [r.seq, t.name])));
     installTimeline = gsap.timeline({onUpdate:wires});
     let index = 0;
-    for (const [seq, from] of positions) {
-      const dest = anchors.get('d'+seq);
+    for (const record of output.rows) {
+      const dest = anchors.get('d'+record.seq);
       if (!dest) continue;
-      const to = dest.getBoundingClientRect();
-      const origin = sources.get(seq) ?? 'Memtable';
-      const message = `${dest.dataset.key} ${fmtSeq(seq)} · ${origin} → ${output.name}`;
+      const origin = origins.get(record.seq);
+      if (origin) {
+        const to = dest.getBoundingClientRect();
+        const start = index++ * .38;
+        installTimeline.call(() => {
+          transfer.textContent = record.key + ' ' + fmtSeq(record.seq) + ' · ' + origin.file + ' → ' + output.name;
+        }, [], start);
+        installTimeline.fromTo(dest, {x:origin.box.left-to.left, y:origin.box.top-to.top, opacity:.45},
+          {x:0, y:0, opacity:1, duration:.58, ease:'power2.inOut', clearProps:'transform,opacity'}, start);
+        continue;
+      }
+      const source = flushInstall && anchors.get('m'+record.seq);
+      if (!source) continue;
+      const label = element('span','travelling-write flushing-record',record.key + ' = ' + recordValue(record));
+      label.setAttribute('aria-hidden','true');
+      label.hidden = true;
+      root.append(label);
+      const cursor = {progress:0};
       const start = index++ * .38;
-      installTimeline.call(() => { transfer.textContent = message; }, [], start);
-      installTimeline.fromTo(dest,
-        {x:from.left-to.left, y:from.top-to.top, opacity:.45, zIndex:2, outline:'2px solid #b77528'},
-        {x:0, y:0, opacity:1, duration:.58, ease:'power2.inOut', clearProps:'transform,opacity,zIndex,outline'}, start);
+      installTimeline.set(dest,{opacity:.25},0);
+      installTimeline.call(() => {
+        transfer.textContent = record.key + ' ' + fmtSeq(record.seq) + ' · Memtable → ' + output.name;
+        source.classList.add('flush-origin');
+        label.hidden = false;
+      }, [], start);
+      installTimeline.to(cursor, {progress:1, duration:1.65, ease:'power2.inOut', onUpdate:() => {
+        const box = root.getBoundingClientRect();
+        const a = source.getBoundingClientRect(), b = dest.getBoundingClientRect();
+        const t = cursor.progress;
+        label.style.left = (a.left + a.width/2)*(1-t) + (b.left + b.width/2)*t - box.left + 'px';
+        label.style.top = (a.top + a.height/2)*(1-t) + (b.top + b.height/2)*t - box.top + 'px';
+      }}, start);
+      installTimeline.call(() => {
+        label.remove();
+        dest.classList.add('flush-arrival');
+      }, [], start + 1.65);
+      installTimeline.set(dest,{clearProps:'opacity'},start + 1.65);
     }
     installTimeline.call(() => {
-      transfer.textContent = `${output.rows.length} records installed in ${output.name}.`;
+      transfer.textContent = output.rows.length + (output.rows.length === 1 ? ' record' : ' records') + ' installed in ' + output.name + '.';
+      wires();
     });
     return installTimeline;
   }
@@ -191,8 +255,10 @@ export function recordChart(root, onInspect, openBloom) {
     host.hidden = true;
     document.querySelector('#operation-inspections').append(host);
     columns[owner].body.before(toggle);
-    mountControl(host, OperationInspector)({title, panel, close:closeInspector});
-    return { title, owner, toggle, panel, host, renderToggle, view:createView(panel), note:[title,'',description] };
+    const render = mountControl(host, OperationInspector);
+    const show = open => render({title, panel, open, close:closeInspector});
+    show(false);
+    return { title, owner, toggle, panel, host, show, renderToggle, view:createView(panel), note:[title,'',description] };
   }
   const details = {
     compact:addDetail('compact','Compaction','sources',compactionView,
@@ -212,8 +278,13 @@ export function recordChart(root, onInspect, openBloom) {
         const a=positions.get(l.a), b=positions.get(l.b);
         const x=a.right-box.left, X=b.left-box.left, y=a.top-box.top, Y=b.top-box.top;
         const bend=Math.min(84,Math.max(0,(X-x)*.6));
+        if (l.color === 'log-ram') {
+          if (l.seq === transferView.seq) transferView.measure(a, b, box, bend);
+          if (l.seq === walReplay.seq) walReplay.measure(a, b, box, bend);
+        }
         return `M${x},${y} C${x+bend},${y} ${X-bend},${Y} ${X},${Y} L${X},${Y+b.height} C${X-bend},${Y+b.height} ${x+bend},${y+a.height} ${x},${y+a.height} Z`;
       });
+    paths.classed('write-ribbon', l => l.color === 'log-ram' && (l.seq === transferView.seq || l.seq === walReplay.seq));
     function carriesStep(l) {
       if (!runningStep || runningStep.key && runningStep.key !== l.key) return false;
       if (runningStep.seq && l.seq !== runningStep.seq) return false;
@@ -242,7 +313,8 @@ export function recordChart(root, onInspect, openBloom) {
     const r=element('div','record '+kind);
     r.tabIndex=0; r.dataset.key=key; r.dataset.anchor=id;
     r.setAttribute('role','button');
-    r.setAttribute('aria-haspopup','dialog');
+    if (parent.closest('.column.route')) r.setAttribute('aria-controls','write-path-detail');
+    else r.setAttribute('aria-haspopup','dialog');
     r.setAttribute('aria-label',label+(extra?' · '+extra:''));
     r.title=r.getAttribute('aria-label');
     const pin=element('i','pin');
@@ -284,9 +356,11 @@ export function recordChart(root, onInspect, openBloom) {
   const renderPaging = mountControl(document.querySelector('#paging'), KeyPaging);
   function updateDisclosures() {
     for (const [id, {body, renderHead}] of Object.entries(columns)) {
-      renderHead({ label:stages[id][0], controls:body.id+' stage-inspection', expanded:expanded===id,
+      renderHead({ label:stages[id][0], controls:body.id + (id === 'route' ? ' write-path-detail' : ' stage-inspection'), expanded:expanded===id,
         variant:'ghost', onClick:()=>inspect(expanded===id?null:id) });
     }
+    details.flush.toggle.hidden = !client.hidden;
+    details.compact.toggle.hidden = !client.hidden;
     for (const [id, detail] of Object.entries(details)) {
       detail.renderToggle({ label:detail.title, controls:detail.host.id, expanded:expanded===id,
         disabled:engine.status!=='online', variant:'secondary', onClick:()=>inspect(expanded===id?null:id) });
@@ -301,7 +375,7 @@ export function recordChart(root, onInspect, openBloom) {
     keyPage=Math.min(keyPage,pages-1);
     const shown=keys.slice(keyPage*size,(keyPage+1)*size);
     const lookupKeys = lookup && !keys.includes(lookup.key) ? [...shown, lookup.key] : shown;
-    const filter=r=>shown.includes(r.key);
+    const filter=r=>shown.includes(r.key) || (runningStep?.operation === 'restart' && r.key === runningStep.key);
     renderPaging({page:keyPage, pages, range:`Keys ${keyPage*size+1}–${Math.min(keys.length,(keyPage+1)*size)} of ${keys.length}`,
       change: delta => { keyPage+=delta; draw(); }});
     anchors=new Map();links=[];
@@ -383,7 +457,12 @@ export function recordChart(root, onInspect, openBloom) {
       file.classList.toggle('probing', runningStep?.source === t.name);
       for(const r of t.rows) {
         const record = row(file,'d'+r.seq,r.key,'file',r.operation==='delete' ? r.key+' · deleted' : r.key,recordValue(r)+' · '+fmtSeq(r.seq));
+        if (input || t.name === plan?.output?.name || root.classList.contains('compare-versions')) {
+          record.querySelector('.record-label').textContent = r.key + ' = ' + recordValue(r);
+          record.querySelector('.extra').textContent = fmtSeq(r.seq);
+        }
         if (input) {
+          record.classList.toggle('merge-drop', dropped.has(r.seq));
           const decision = (dropped.has(r.seq) ? 'Drop ' : 'Keep ') + fmtSeq(r.seq);
           record.append(element('span','merge-decision',decision));
           record.setAttribute('aria-label',record.title+' · '+decision);
@@ -397,6 +476,9 @@ export function recordChart(root, onInspect, openBloom) {
       const message = engine.status === 'crashed' ? 'Offline until restart' : 'Waiting for WAL replay';
       columns.lookup.body.append(element('p','empty',message));
       columns.output.body.append(element('p','empty',message));
+      if (engine.status === 'crashed') {
+        for (const entry of log) anchors.get('l'+entry.seq)?.classList.add('replaying');
+      }
       const replay = runningStep?.replay;
       if (replay) {
         for (const prefix of ['l','m']) anchors.get(prefix+replay.seq)?.classList.add('replaying');
@@ -477,15 +559,35 @@ export function recordChart(root, onInspect, openBloom) {
     if (expanded !== id) inspect(id, undefined, next);
     else { selection = next; updateInspector(); }
   }
-  function closeInspector() {
+  function closeInspector(restore = true) {
     const trigger = anchors.get(selection?.anchor) ?? (details[expanded]?.toggle ?? columns[expanded]?.head)?.querySelector('button');
     inspect(null);
-    trigger?.focus({preventScroll:true});
+    if (restore) trigger?.focus({preventScroll:true});
   }
   function updateInspector() {
-    const stage = stages[expanded] && expanded;
-    renderInspector({stage, title:stages[expanded]?.[0], selection, engine, lookup, step:runningStep,
-      close:closeInspector, selectSource:source => { selection = {...selection, source}; updateInspector(); }});
+    if (expanded === 'route') {
+      const record = selection?.seq ? engine.history.find(r => r.seq === selection.seq)
+        : engine.history.findLast(r => r.key === 'juniper') ?? engine.log.at(-1);
+      const from = anchors.get('l' + record?.seq);
+      const to = anchors.get('m' + record?.seq);
+      for (const previous of root.querySelectorAll('.write-origin,.write-arrival')) {
+        previous.classList.remove('write-origin','write-arrival');
+      }
+      from?.classList.add('write-origin');
+      to?.classList.add('write-arrival');
+      let reason = 'ready';
+      if (!record) reason = 'Insert a key to add a WAL entry.';
+      else if (!engine.log.some(r => r.seq === record.seq)) reason = record.key + ' has no active WAL entry for this version.';
+      else if (engine.status === 'crashed') reason = fmtSeq(record.seq) + ' survived in the WAL. Restart to restore ' + record.key + ' to memory.';
+      else if (engine.status === 'recovering') reason = 'Restart is replaying the surviving WAL entries in sequence.';
+      else if (engine.memory.get(record.key)?.seq !== record.seq) reason = 'The memtable has no current row for this version of ' + record.key + '.';
+      else if (!from || !to) reason = 'Use the key paging controls to show ' + record.key + '.';
+      transferView.show(record, reason);
+      wires();
+    }
+    const stage = expanded !== 'route' && stages[expanded] && expanded;
+    renderInspector({stage, title:stages[expanded]?.[0], selection, engine, lookup, step:runningStep, defaultKey:client.hidden ? 'cedar' : 'juniper',
+      close:closeInspector, selectSource:(source, key) => { selection = {anchor:selection?.anchor, key, source}; updateInspector(); }});
   }
   function inspect(id, mode, nextSelection = null) {
     selection = nextSelection;
@@ -496,7 +598,11 @@ export function recordChart(root, onInspect, openBloom) {
     for(const [key, item] of Object.entries(details)) {
       const active = key===id;
       item.view.close();
-      item.host.hidden=!active;
+      const wasOpen = !item.host.hidden;
+      if (active !== wasOpen) {
+        item.host.hidden = !active;
+        item.show(active);
+      }
     }
     if(id==='compact') {
       if(maintenance?.plan) detail.view.live(maintenance);
@@ -506,6 +612,11 @@ export function recordChart(root, onInspect, openBloom) {
       if(maintenance?.flush) detail.view.live(maintenance.flush,maintenance.phase);
       else detail.view.show(engine.planFlush(),engine.lastFlush,mode);
     }
+    if (expanded === 'route' && id !== 'route') {
+      transferView.close();
+      for (const node of root.querySelectorAll('.write-origin,.write-arrival')) node.classList.remove('write-origin','write-arrival');
+    }
+    writeHost.hidden = id !== 'route';
     expanded=id;
     updateDisclosures();
     updateInspector();
@@ -513,8 +624,14 @@ export function recordChart(root, onInspect, openBloom) {
     for(const [key,{col}] of Object.entries(columns)) {
       col.classList.toggle('open',key===id);
     }
+    if (id === 'route') {
+      const viewport = root.parentElement;
+      const left = columns.route.col.offsetLeft;
+      if (left < viewport.scrollLeft || columns.sources.col.offsetLeft + columns.sources.col.offsetWidth > viewport.scrollLeft + viewport.clientWidth) {
+        viewport.scrollLeft = Math.max(0, left - 16);
+      }
+    }
     onInspect(detail?.note ?? stages[id] ?? null);
-    if (detail && mode !== 'frame') detail.host.querySelector('h2')?.focus({preventScroll:true});
     if(!reduced()) {
       layout=Flip.from(before,{duration:.5,ease:'power2.inOut',onUpdate:wires,onComplete:wires});
       if(id && !detail) {
@@ -524,14 +641,25 @@ export function recordChart(root, onInspect, openBloom) {
     }
     wires();
   }
-  document.addEventListener('keydown',e=>{if(e.key==='Escape' && expanded && !e.target.closest('.command-editor') && !document.querySelector('[role=combobox][aria-expanded=true]'))closeInspector()});
-  document.addEventListener('click',e=>{if(expanded && !e.target.closest('.column, header, #policy-controls, .command-editor, #sandbox-controls, #lesson, #paging, #stage-inspection, #operation-inspections, [role=listbox], [role=option]'))inspect(null)});
+  document.addEventListener('keydown', event => {
+    if (expanded === 'route' && event.key === 'Escape' && !event.defaultPrevented) {
+      event.preventDefault();
+      closeInspector();
+    }
+  });
   const observer=new ResizeObserver(wires);
   observer.observe(root);
   Object.values(columns).forEach(c=>observer.observe(c.col));
   observer.observe(client);
   return {
     clientExchange,
+    openRecord(anchor) {
+      const row = anchors.get(anchor);
+      if (!row?.matches('.record')) return;
+      row.click();
+      row.scrollIntoView({block:'nearest', inline:'center'});
+    },
+    closeInspection() { if (expanded) closeInspector(false); },
     showFrame(frame) {
       const step = frame.detail?.step ?? frame.detail;
       this.render(frame.engine, frame.highlight, frame.lookup,
@@ -540,11 +668,17 @@ export function recordChart(root, onInspect, openBloom) {
     },
     render(state,step=null,readTrace=null,nextMaintenance=null) {
       clearExchange();
+      crashFade?.progress(1).kill();
+      crashFade = null;
+      walReplay.close();
+      const crashing = step?.operation === 'crash' && state.status === 'crashed';
+      const lostRows = crashing && !reduced() ? [...columns.sources.body.querySelectorAll('.ram .record')] : [];
       if (step?.clientStatus) {
         clientStatus.dataset.phase = 'processing';
         clientStatus.textContent = step.clientStatus;
       }
-      const positions = captureInputs(nextMaintenance);
+      const origins = captureMergeOrigins(nextMaintenance);
+      const flushInstall = !reduced() && nextMaintenance?.operation === 'flush' && nextMaintenance.phase === 'install' && maintenance?.phase === 'freeze';
       const changed = maintenance !== nextMaintenance;
       maintenance = nextMaintenance;
       showMaintenance();
@@ -559,10 +693,20 @@ export function recordChart(root, onInspect, openBloom) {
       }
       draw(); animateStep();
       if (changed) transfer.textContent = '';
-      const installation = animateInstall(positions);
+      const replay = step?.operation === 'restart' && state.status === 'recovering' && step.replay;
+      const installation = replay ? walReplay.show(replay, 'ready') : crashing ? fadeMemtable(lostRows) : animateInstall(origins, flushInstall);
+      if (replay || crashing) wires();
       if (changed && nextMaintenance?.flush && expanded==='flush') details.flush.view.live(maintenance.flush,maintenance.phase);
       if (changed && nextMaintenance?.plan && expanded==='compact') details.compact.view.live(maintenance);
       const viewport = root.parentElement;
+      if (!client.hidden && (crashing || state.status === 'recovering' || ['freeze','compare'].includes(nextMaintenance?.phase))) {
+        const column = columns.sources.col;
+        if (column.offsetLeft < viewport.scrollLeft || column.offsetLeft + column.offsetWidth > viewport.scrollLeft + viewport.clientWidth) {
+          const routeLeft = columns.route.col.offsetLeft - 12;
+          const right = column.offsetLeft + column.offsetWidth + 12;
+          viewport.scrollLeft = Math.max(routeLeft, right - viewport.clientWidth);
+        }
+      }
       if (client.hidden && !expanded && viewport.scrollWidth > viewport.clientWidth) {
         if (startingRead) viewport.scrollLeft = columns.lookup.col.offsetLeft - 16;
         if (changed && ['freeze','compare','install'].includes(maintenance?.phase)) {

@@ -103,3 +103,33 @@ body { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
+
+/* Keep the header visible while the inspection body scrolls. */
+.stage-inspector {
+  position: fixed;
+  z-index: 5;
+  right: clamp(12px, 3vw, 48px);
+  bottom: 16px;
+  width: min(400px, calc(100vw - 24px));
+  max-height: 48dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 8px 36px #28324726;
+}
+.inspection-heading { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inspection-heading h2 { font-size: 17px; letter-spacing: -.03em; margin: 0; }
+.inspection-subtitle { margin: 3px 0 0; font: 600 13px/1.4 var(--mono); overflow-wrap: anywhere; }
+.inspection-content, .calculation-content {
+  min-height: 0; overflow: auto; overscroll-behavior: contain; overflow-wrap: anywhere;
+}
+.inspection-content { color: #414b60; }
+.inspection-content h3 { font: 600 14px var(--mono); margin: 6px 0; }
+.inspection-content p { font-size: 13px; line-height: 1.5; margin: 8px 0; }
+.inspection-content dl { margin: 10px 0 0; }
+.operation-inspector { width: min(780px, calc(100vw - 24px)); max-height: min(74dvh, 760px); }
+@media (max-width: 650px) {
+  .stage-inspector { bottom: 8px; right: 12px; max-height: 38dvh; }
+  .operation-inspector { max-height: 60dvh; }
+}

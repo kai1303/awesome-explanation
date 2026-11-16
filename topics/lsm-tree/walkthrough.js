@@ -11,14 +11,14 @@ function writeBatch(engine, batch) {
   for (const [key, value] of batch) Array.from(engine.write(key, value));
 }
 
-export function articleEngine({seedJuniper = false} = {}) {
+export function articleEngine({seedJuniper = false, pendingWrites = batches[2]} = {}) {
   const engine = new StorageEngine();
   for (const batch of batches.slice(0, 2)) {
     writeBatch(engine, batch);
     if (seedJuniper && batch === batches[1]) Array.from(engine.write('juniper', 'needles'));
     Array.from(engine.flush());
   }
-  writeBatch(engine, batches[2]);
+  writeBatch(engine, pendingWrites);
   return engine;
 }
 

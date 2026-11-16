@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
-import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
+import { CalculationDialog } from '../../../design-system/inspectors.jsx';
 import { Button } from '@astryxdesign/core/Button';
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import { bloomBits, buildBloom, keyMask } from '../bloom.js';
@@ -80,9 +80,7 @@ export function BloomInspector({table, lookup, close}) {
     .filter(row => bit(keyMask(row.key),inspected)).map(row => row.key);
   const equation = tested.map(i => bit(table.bloom,i)).join(' AND ');
 
-  return <Dialog isOpen onOpenChange={close} width="min(700px, calc(100vw - 24px))"
-    maxHeight="85dvh" padding={4} aria-label={`Bloom filter · ${table.name}`}>
-    <DialogHeader title="Bloom filter" subtitle={table.name} onOpenChange={close} />
+  return <CalculationDialog title="Bloom filter" subtitle={table.name} wide onDismiss={close}>
     <div className="bloom-inspection">
       <a href={lessonHref(table.name, table.rows.map(row => row.key), query, building ? 'insert' : 'query')} target="_blank" rel="noopener">
         How does a Bloom filter work? Explore this file step by step ↗
@@ -127,5 +125,5 @@ export function BloomInspector({table, lookup, close}) {
         <Button label="Add next key" size="sm" isDisabled={step >= end} onClick={() => seek(step + 1)} />
       </div>}
     </div>
-  </Dialog>;
+  </CalculationDialog>;
 }

@@ -40,6 +40,7 @@ export function OperationBar({ run, reset, policy, comparison, switchPolicy, dem
   function advance(frame) {
     const step = frame.steps.next();
     if (!step.done) {
+      if (frame.paused) step.value?.pause();
       setPlayback({...frame, animation:step.value});
       return;
     }
@@ -83,12 +84,27 @@ export function OperationBar({ run, reset, policy, comparison, switchPolicy, dem
     if (demo) start(demo);
   }, []);
 
+  function togglePlayback() {
+    playback.animation?.paused(!playback.paused);
+    setPlayback({...playback, paused:!playback.paused});
+  }
+
   function resetExample() {
     reset();
     setOp(null);
     setResult(null);
     setCrashed(false);
   }
+
+  const playbackControls = playback && <div className="command-editor-actions">
+          <Button label={playback.paused ? 'Resume' : 'Pause'} size="sm" variant="primary"
+            onClick={togglePlayback} />
+          <Button label="Next step" size="sm" onClick={() => {
+            playback.animation?.eventCallback('onComplete', null);
+            playback.animation?.progress(1);
+            advance({...playback, paused:true});
+          }} />
+      </div>;
 
   return <section id="command" aria-label="Simulation controls">
     <div className="command-editor">
@@ -106,14 +122,9 @@ export function OperationBar({ run, reset, policy, comparison, switchPolicy, dem
           active={op === id} isDisabled={busy || (crashed && id !== 'restart')} onClick={() => start(id)} />)}
       </div>
       {sql && <code className="command-sql">{sql}</code>}
-      {playback && <div className="command-editor-actions">
-          <Button label={playback.paused ? 'Resume' : 'Pause'} size="sm" variant="primary"
-            onClick={() => {
-              playback.animation?.paused(!playback.paused);
-              setPlayback({...playback, paused:!playback.paused});
-            }} />
-          <Button label="Next step" size="sm" onClick={() => advance({...playback, paused:true})} />
-      </div>}
+      {['compact','flush','crash','restart'].includes(playback?.op)
+        ? createPortal(playbackControls, document.getElementById('maintenance-playback'))
+        : playbackControls}
     </div>
     <Button className="client-reset" label="Reset example" size="sm" variant="ghost" isDisabled={busy} onClick={resetExample} />
     {createPortal(<>

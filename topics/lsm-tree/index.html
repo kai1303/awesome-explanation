@@ -17,6 +17,7 @@
 <div id="policy-controls"></div>
 <p id="maintenance-status" title="Memtable size counts UTF-8 bytes in the current keys and values."></p>
 <div id="maintenance-frame" role="status" hidden><strong></strong><span></span></div>
+<div id="maintenance-playback"></div>
 <div id="viewport" class="flow-viewport" tabindex="0" aria-label="Scrollable record flow diagram"><div id="chart"><svg id="wires" aria-hidden="true"><defs></defs><g></g></svg>
 <section id="sandbox-controls" class="column client" aria-labelledby="client-title">
 <h2 id="client-title">Client</h2><p id="client-status" class="subtitle" role="status">SQL requests and results</p>
@@ -67,7 +68,7 @@
 
   <h3 id="crash-before">What if the engine crashes before the flush?</h3>
   <p>Click <strong>Reset example</strong>, then choose <strong>Engine → Crash</strong>. Where is the surviving copy of <code>jade</code>? The memtable is gone. The installed table containing <code>cedar</code> still says <code>sage</code>. In this simulation the active WAL survives the crash. Click <strong>Restart</strong> to replay the WAL. The engine replays #06 (<code>oak</code>), #07 (<code>cedar</code>), and #08 (<code>ash</code>) in arrival order, rebuilding the memtable before serving reads. <span id="crash-after">Try the same crash immediately after a flush.</span> This time the log is empty. Predict which file will answer the next read for <code>cedar</code>, then check the operation trace.</p>
-  <a href="#lesson" data-lesson="crash-before">Crash before flushing ↑</a> · <a href="#lesson" data-lesson="crash-after">Crash after flushing ↑</a>
+  <a href="#lesson" data-lesson="crash-before">Crash before flushing ↑</a> · <a href="#lesson" data-lesson="crash-after">Crash after flushing ↑</a> · <a href="?demo=recovery">Try WAL replay with juniper ↑</a>
 </article>
 </main>
 <div id="stage-inspection"></div><div id="operation-inspections"></div><div id="bloom-inspection"></div>

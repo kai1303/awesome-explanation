@@ -4,6 +4,7 @@ import { gsap } from 'gsap';
 import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
 import { CommandRow, Disclosure } from './controls.jsx';
+import { StagePopover } from './inspectors.jsx';
 import { drawRibbon, reducedMotion } from '../topics/chart-motion.js';
 import { exampleEngine } from '../topics/lsm-tree/engine.js';
 import './guide.css';
@@ -67,16 +68,19 @@ function ReadExample() {
             <Record role="ram" endpoint={fromRam ? 'source' : undefined}>RAM · {fromRam ? 'Hit' : 'Miss'}</Record>
             <Record role="file" endpoint={fromRam ? undefined : 'source'}>{file.name} · {fromRam ? 'Skipped' : 'Hit'}</Record>
           </div></section>
-        <section><Disclosure label="Visible value" expanded={expanded} controls="read-detail" onClick={() => inspect(!expanded)} />
+        <section><Disclosure id="value-trigger" aria-haspopup="dialog" label="Visible value" expanded={expanded} controls="read-detail" onClick={() => inspect(!expanded)} />
           <p className="subtitle">Newest version</p>
           <div className="sample-rows"><Record role="winner" endpoint="result">{key} = {hit.found.value}</Record></div>
         </section>
       </div>
     </div>
-    <div className="demo-detail" id="read-detail" hidden={!expanded}>
+    {expanded && <StagePopover id="read-detail" title="Visible value" onDismiss={restore => {
+      inspect(false);
+      if (restore) document.getElementById('value-trigger').focus({preventScroll:true});
+    }}>
       <strong>Version #{hit.found.seq} from {source}</strong>
       <p>{trace.slice(1).map(step => step.text).join(' ')}</p>
-    </div>
+    </StagePopover>}
     <div className="footline" role="status">{fromRam ? 'The memtable supplies the newest value. The file is skipped.' : 'The memtable misses. The engine checks the file and returns its matching record.'}</div>
   </>;
 }

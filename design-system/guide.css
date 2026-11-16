@@ -20,8 +20,6 @@
 .demo-board path { stroke: var(--ribbon); stroke-width: 9px; opacity: .38; fill: none; }
 .demo-board h3 { font-size: 14px; font-weight: 600; line-height: 28px; margin: 0; }
 .demo-board .client-group, .sample-rows { margin-top: 20px; }
-.demo-detail { margin: 0 20px 14px; padding: 12px; background: #f5f2fa; line-height: 1.5; }
-.demo-detail p { margin: 5px 0 0; }
 #colors > p { color: var(--muted); line-height: 1.55; margin: 6px 0 16px; }
 .palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .palette strong, .palette code { display: block; margin-top: 5px; }

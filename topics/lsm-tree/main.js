@@ -1,6 +1,6 @@
 import { newLookup, trackProbe } from './bloom.js';
 import { policies, sandboxLimits } from './compaction-planner.js';
-import { conditionalWrites } from './engine.js';
+import { conditionalWrites, StorageEngine } from './engine.js';
 import { articleEngine, articleFrames } from './walkthrough.js';
 import { BloomInspector } from './diagram/bloom-inspector.jsx';
 import { recordChart } from './diagram/chart.js';
@@ -27,7 +27,8 @@ const chart=recordChart($('#chart'),stage=>{
 });
 let engine, layouts, comparison;
 let policy = 'tiered';
-const juniperDemo = new URLSearchParams(location.search).get('demo');
+const params = new URLSearchParams(location.search);
+const juniperDemo = params.get('demo');
 const names={client:'Client',wal:'Write-ahead log',mem:'Memtable',disk:'SSTables'};
 const stageFor={client:'history',wal:'route',mem:'sources',disk:'sources'};
 
@@ -44,15 +45,26 @@ function showThresholds() {
     `Auto flush · ${engine.memtableBytes}/${sandboxLimits.memtableBytes} B in RAM　 ${threshold}`;
 }
 
-function reset(demo = false) {
+function reset(demo = ['write-path','flush','compact','recovery'].includes(juniperDemo) ? juniperDemo : false) {
+  const unflushedJuniper = demo === 'flush' || demo === 'recovery';
   layouts = {};
   comparison = null;
   for (const id of Object.keys(policies)) {
-    layouts[id] = articleEngine({seedJuniper:demo === 'bloom'});
+    if (demo === 'compact') {
+      const seeded = new StorageEngine(id);
+      for (const [op,value] of [['create','needles'], ['update','pine']]) {
+        Array.from(seeded.runSandbox(op,'juniper',value));
+        Array.from(seeded.runSandbox('flush'));
+      }
+      layouts[id] = seeded;
+      continue;
+    }
+    layouts[id] = articleEngine({seedJuniper:demo === 'bloom', pendingWrites:unflushedJuniper ? [] : undefined});
     layouts[id].policy = id;
-    if (demo === 'juniper' || demo === 'bloom') {
+    if (['juniper', 'bloom', 'write-path'].includes(demo)) {
       Array.from(layouts[id].runSandbox('flush'));
     }
+    if (demo === 'write-path' || unflushedJuniper) Array.from(layouts[id].runSandbox('create','juniper','needles'));
     if (demo === 'juniper') {
       Array.from(layouts[id].runSandbox('write','ash','silver'));
       Array.from(layouts[id].runSandbox('write','cedar','jade'));
@@ -61,18 +73,33 @@ function reset(demo = false) {
   engine = layouts[policy];
   showThresholds();
   $('#engine-status').textContent='Follow a key across the engine.';
+  $('#chart').classList.toggle('compare-versions',demo === 'compact');
   chart.reset();chart.render(engine);
+  if (demo === 'write-path' || unflushedJuniper) {
+    const viewport = $('#viewport');
+    viewport.scrollLeft = unflushedJuniper ? 0 : $('#body-route').parentElement.offsetLeft - 16;
+    $('#engine-status').textContent = demo === 'recovery'
+      ? 'Juniper is in the WAL and memtable. Click Crash before it flushes, then Restart to replay its WAL entry.'
+      : demo === 'flush' ? 'Click Flush to copy juniper into a new SSTable.' : 'Click Write path to follow juniper from the WAL into memory.';
+  }
+  if (demo === 'compact') {
+    $('#viewport').scrollLeft = 0;
+    $('#engine-status').textContent = 'Click Compact under Engine to merge the two juniper versions.';
+  }
   if (demo === 'bloom') {
     const viewport = $('#viewport');
     viewport.scrollLeft = Math.min($('#body-sources').parentElement.offsetLeft - 16, viewport.scrollWidth - viewport.clientWidth);
   }
   $('#events').replaceChildren();
   if (demo === 'bloom') trace('Juniper','Follow the filters across three SSTables to find juniper.');
+  else if (demo === 'write-path' || unflushedJuniper) trace('INSERT','juniper = needles was appended to the WAL and applied to the memtable.');
+  else if (demo === 'compact') trace('Juniper','Flushed needles, updated it to pine, then flushed again.');
   else if (demo === 'juniper') trace('Juniper','Three files on disk. Writing juniper fills the memtable and triggers a flush, then a merge.');
   else trace('Example','Eight writes, two flushes. Cedar has two versions. Select INSERT to add juniper.');
   refreshControls(demo === 'bloom' ? 'read' : demo === 'juniper' ? 'create' : null);
 }
 function* run(op, key, value, sql) {
+  if (['flush','compact','crash','restart'].includes(op)) chart.closeInspection();
   const previousSeq = engine.seq;
   const conditional = conditionalWrites.includes(op);
   let lookup = op === 'read' || conditional ? newLookup(key) : null;
@@ -107,7 +134,7 @@ function* run(op, key, value, sql) {
         location = lookup ? 'Version lookup' : step.record ? 'Write history' : 'Client';
       }
       const action = step.automatic ?? command;
-      const installation = chart.render(engine,{clientStatus:`${action} · ${location}`,stage,key:step.record?.key ?? (activeOp==='read'||activeOp==='write'||conditionalWrites.includes(activeOp)?key:null),seq:step.record?.seq ?? (activeOp==='write'?engine.seq:null),source:step.source, replay:step.record},lookup,maintenance);
+      const installation = chart.render(engine,{clientStatus:`${action} · ${location}`,stage,operation:activeOp,key:step.record?.key ?? (activeOp==='read'||activeOp==='write'||conditionalWrites.includes(activeOp)?key:null),seq:step.record?.seq ?? (activeOp==='write'?engine.seq:null),source:step.source, replay:step.record},lookup,maintenance);
       if (step.reason) trace('Threshold reached',step.reason);
       trace(names[step.node],step.text);yield installation;
     }
@@ -235,6 +262,7 @@ for (const link of document.querySelectorAll('[data-lesson]')) {
   };
 }
 setGuided(false);
+if (params.has('inspect')) chart.openRecord(params.get('inspect'));
 
 const mergeHost = $('#compare-four-files');
 const showFourFiles = mountControl(mergeHost, FourFileMerge);
