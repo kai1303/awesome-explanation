@@ -1,0 +1,105 @@
+/* Foundations shared by the reference chart, topic pages, and component examples. */
+:root {
+  color-scheme: light;
+  --ink: #283247;
+  --muted: #657085;
+  --line: #e4e6ed;
+  --surface: #fff;
+  --link: #594498;
+  --focus: #8366ed;
+  --title: #516ee7;
+  --title-accent: #8754e6;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --gutter: 3vw;
+  font: 14px "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--surface);
+  color: var(--ink);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.explainer-page { max-width: 1900px; margin-inline: auto; }
+.explainer-title {
+  margin: 0;
+  color: var(--title);
+  font-size: clamp(20px, 2vw, 29px);
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -.06em;
+}
+.explainer-title em { color: var(--title-accent); font-style: normal; }
+
+/* Each encoding supplies a text color, a pin, a row surface, and an SVG ribbon. */
+.history { --t: #59657b; --fill: #c9cfdc; --light: #f1f3f7; --ribbon: #9ca3af; }
+.log     { --t: #3976d2; --fill: #b3ceff; --light: #edf4ff; --ribbon: #629afe; }
+.ram     { --t: #07856b; --fill: #94d8c3; --light: #e7f7f0; --ribbon: #30b990; }
+.file    { --t: #a86b1b; --fill: #efc48d; --light: #fcf4e8; --ribbon: #f0a452; }
+.winner  { --t: #8355c5; --fill: #c9a8f4; --light: #f2eafd; --ribbon: #9365eb; }
+
+.chartbar, .footline, .notes { margin-inline: var(--gutter); }
+.chartbar, .footline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.chartbar { padding: 25px 0 12px; }
+.chartbar > div:first-child { display: flex; align-items: baseline; gap: 14px; }
+.chartbar strong { font-size: 18px; letter-spacing: -.045em; }
+.chartbar span, .footline { font-size: 12px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 15px; }
+.legend span::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px;
+  border-radius: 2px; background: var(--fill);
+}
+.flow-viewport { overflow-x: auto; scrollbar-width: thin; scrollbar-color: #d4cfe9 transparent; }
+.subtitle, .group-name { font: 10px/1.4 var(--mono); color: #748096; }
+.subtitle { margin: 3px 0 0; }
+.group-name { margin-bottom: 9px; color: var(--t); font-weight: 650; }
+.record {
+  display: flex; align-items: center; position: relative; min-width: 0;
+  height: 21px; margin-bottom: 7px; gap: 7px; padding: 0 5px 0 0;
+  font-size: 12px; color: #394158; background: var(--light);
+}
+.record .pin { width: 6px; height: 100%; flex-shrink: 0; background: var(--fill); }
+.client-group { display: grid; gap: 7px; }
+.client-group .group-name { margin: 0 0 2px; }
+.client-group .command-row {
+  width: 100%; height: 21px; min-height: 21px; justify-content: flex-start; padding: 0 7px;
+  border: 0; border-left: 6px solid #cbd0de; border-radius: 0; background: #f1f2f6;
+  color: #394158; font-size: 12px; font-weight: 500;
+}
+.client-group .command-row:hover:enabled { background: #e8eaf1; }
+.client-group .command-row[data-active=true] { border-color: #7956ae; background: #eee8f7; color: #523783; }
+.footline { min-height: 43px; border-top: 1px solid var(--line); padding: 10px 0; }
+.notes {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6vw;
+  padding: 20px 0 24px; border-top: 1px solid var(--line);
+}
+.notes h2 { font-size: 16px; margin: 0 0 9px; letter-spacing: -.03em; }
+.notes p, .notes li { font-size: 13px; line-height: 1.55; color: #556075; margin: 0; }
+.walkthrough { width: min(68ch, 92%); margin: 2rem auto 5rem; font-size: 1.1rem; line-height: 1.65; }
+.walkthrough h2, .walkthrough h3 { line-height: 1.25; margin: 2em 0 .6em; }
+.walkthrough h2 { font-size: 1.7em; }
+.walkthrough h3 { font-size: 1.25em; }
+.walkthrough p { margin: .8em 0; }
+.walkthrough code { font-family: var(--mono); font-size: .92em; }
+.walkthrough a { color: var(--link); text-decoration: underline; }
+
+@media (max-width: 960px) {
+  .chartbar { align-items: flex-start; }
+  .chartbar > div:first-child { display: block; }
+  .chartbar > div:first-child span { display: block; margin-top: 4px; }
+}
+@media (max-width: 650px) {
+  :root { --gutter: 16px; }
+  .explainer-title { font-size: 23px; }
+  .chartbar { display: block; padding-top: 16px; }
+  .legend { margin-top: 12px; }
+  .notes { grid-template-columns: 1fr; gap: 20px; }
+  .footline { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}

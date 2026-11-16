@@ -3,9 +3,10 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   base: './',
+  appType: 'mpa',
   build: {
     rollupOptions: {
-      input: ['index.html', ...globSync('topics/*/index.html').sort()],
+      input: ['index.html', 'design-system/index.html', ...globSync('topics/*/index.html').sort()],
     },
   },
 });

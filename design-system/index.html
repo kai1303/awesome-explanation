@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Explainer design system · Awesome Explanation</title>
+</head>
+<body>
+  <header class="guide-nav"><a class="wordmark" href="../">Awesome Explanation</a>
+    <nav aria-label="Design system"><a href="#components">Components</a><a href="#colors">Color roles</a><a href="#usage">Usage</a></nav>
+  </header>
+  <main class="guide">
+    <h1>Explainer design system</h1>
+    <p class="intro">Follow one record from a request to its result. The LSM tree sets the pattern for diagram stages, controls, color, and motion across the explainers.</p>
+    <section id="components" aria-labelledby="components-title">
+      <div class="section-heading"><h2 id="components-title">Components</h2><a href="../topics/lsm-tree/">Open the LSM tree ↗</a></div>
+      <div class="specimen"><div class="chartbar"><div><strong>Read a record</strong><span>Choose a key in Client.</span></div>
+        <div class="legend"><span class="ram">Memory</span><span class="file">Disk</span><span class="winner">Visible</span></div>
+      </div><div id="example"></div></div>
+    </section>
+    <section id="colors" aria-labelledby="colors-title">
+      <h2 id="colors-title">Color roles</h2>
+      <p>Use a light surface for the row, a solid pin for its source, and a ribbon for its path. Pair each color with a label.</p>
+      <div class="palette">
+        <div class="history"><div class="sample"></div><strong>History</strong><code>.history</code></div>
+        <div class="log"><div class="sample"></div><strong>Write-ahead log</strong><code>.log</code></div>
+        <div class="ram"><div class="sample"></div><strong>Memory</strong><code>.ram</code></div>
+        <div class="file"><div class="sample"></div><strong>Disk</strong><code>.file</code></div>
+        <div class="winner"><div class="sample"></div><strong>Visible result</strong><code>.winner</code></div>
+      </div>
+    </section>
+    <section id="usage" aria-labelledby="usage-title">
+      <h2 id="usage-title">Building an explainer</h2>
+      <dl class="usage">
+        <div><dt>Page layout</dt><dd>Lead with the operation, then arrange its stages from left to right. Let the diagram scroll inside its viewport. Put the operation trace below it and the article beneath that.</dd></div>
+        <div><dt>Type and labels</dt><dd>Use the interface font for headings and explanations. Set keys, file names, bit positions, and sequence numbers in monospace. Show the decision beside the value.</dd></div>
+        <div><dt>Actions and inspection</dt><dd>Use an Astryx command row for a direct action and a stage disclosure for details. Keep the selected record in view. Inspectors explain the current input, rule, and outcome.</dd></div>
+        <div><dt>Motion</dt><dd>Animate the record between its measured endpoints with GSAP. Keep the outcome readable after the animation ends. With reduced motion, show the same route and result immediately.</dd></div>
+      </dl>
+    </section>
+  </main>
+  <script type="module" src="./example.jsx"></script>
+</body>
+</html>

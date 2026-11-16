@@ -24,8 +24,6 @@ Interactive explanations of data structures and database engines. Step through a
 
 </details>
 
-- [B+ tree](https://kai1303.github.io/awesome-explanation/topics/b-plus-tree/)
-
 ## Data structures
 
 - [Bloom filter](https://kai1303.github.io/awesome-explanation/topics/bloom-filter/) — Insert words into a bit array and test set membership. In **Insert**, follow each word to the two bits it sets. In **Query**, compare `juniper` (inserted), `cedar` (definitely absent), and `teak` (a false positive). Click **Hash function** to watch the running hash change with each letter. For `juniper`, the final hash is `0x3F20DCD0` and selects bits 0 and 13.
@@ -42,7 +40,9 @@ To add a working explanation, open a pull request with a link under its topic an
 
 Use the repository skill [design-explainer](.agents/skills/design-explainer/SKILL.md) to research the mechanism and write the article readers will see alongside the diagram. The [LSM tree walkthrough](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/#how-it-works) follows one key from its first write through a flush, a merge, and crash recovery.
 
-Then use [build-explainer](.agents/skills/build-explainer/SKILL.md) with that article to build the interactive diagram. For example, the [B+ tree](topics/b-plus-tree/index.html) connects each passage to a step you can inspect, rewind, or repeat with another key.
+Use the [explainer design system](https://kai1303.github.io/awesome-explanation/design-system/) for page layout, record rows, command controls, color roles, and motion. The [implementation guide](design-system/README.md) shows what to import.
+
+Then use [build-explainer](.agents/skills/build-explainer/SKILL.md) with that article to build the interactive diagram. The [LSM article](topics/lsm-tree/index.html#update) links its cedar example to the corresponding read in the diagram.
 
 Each explanation lives in `topics/<slug>/`. The slug is its URL, so use a name that can stay the same even if its category in this README changes.
 

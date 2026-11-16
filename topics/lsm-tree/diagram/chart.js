@@ -1,7 +1,8 @@
 import { bloomBits, keyMask } from '../bloom.js';
 import { recordValue } from '../engine.js';
 import { fileLabel, newestVersion } from '../compaction-planner.js';
-import { Disclosure, KeyPaging, mountControl } from '../controls.jsx';
+import { Disclosure } from '../../../design-system/controls.jsx';
+import { KeyPaging, mountControl } from '../controls.jsx';
 // Ribbon geometry and measured DOM anchors adapted from Polo Club's
 // Transformer Explainer, Sankey.svelte. See public/transformer-explainer-LICENSE.txt.
 import { OperationInspector, StageInspector } from './stage-inspector.jsx';
@@ -20,7 +21,6 @@ const stages = {
   lookup: ['Version lookup', 'Probe order', 'Each row is a key and each column is a read source. Scan from memory through the runs, newest first. The highest write sequence wins. A winning tombstone means the key is absent. Read a key to see the sources checked in order. A read stops once the remaining sources cannot contain a newer version.'],
   output: ['Visible values', 'Latest per key', 'Each row shows the winning key and value, its write sequence number, and the source that would serve it.']
 };
-const colors = {history:'#9ca3af',log:'#629afe',ram:'#30b990',file:'#f0a452',winner:'#9365eb'};
 const gradients = [['history','log'],['history','file'],['log','ram'],['file','file'],['ram','winner'],['file','winner'],['winner','winner']];
 const fmtSeq = n => '#' + String(n).padStart(2,'0');
 function element(tag, cls, content) {
@@ -36,8 +36,8 @@ export function recordChart(root, onInspect, openBloom) {
   const defs = svg.select('defs');
   for (const [a,b] of gradients) {
     const grad = defs.append('linearGradient').attr('id',a+'-'+b);
-    grad.append('stop').attr('stop-color', colors[a]);
-    grad.append('stop').attr('offset','100%').attr('stop-color',colors[b]);
+    grad.append('stop').attr('class', a).attr('stop-color', 'var(--ribbon)');
+    grad.append('stop').attr('offset','100%').attr('class', b).attr('stop-color','var(--ribbon)');
   }
   let engine, expanded = null, focusedKey = null, keyPage = 0, runningStep = null;
   let lookup = null, selection = null;

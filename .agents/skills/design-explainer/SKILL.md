@@ -26,7 +26,7 @@ Deliver finished paragraphs, meaningful headings, and source links near the clai
 
 ## Hand each lesson to the diagram builder
 
-Alongside the manuscript, draw one wide chart for the whole worked example. Sketch the stages from left to right, from the request to its result. Name the stages using the article’s vocabulary and draw the relationships the learner needs to see inside and between them. Keep those landmarks in the same places across lessons. Use the [B+ tree chart](../../../topics/b-plus-tree/index.html#diagram) as the layout reference.
+Alongside the manuscript, draw one wide chart for the whole worked example. Sketch the stages from left to right, from the request to its result. Name the stages using the article’s vocabulary and draw the relationships the learner needs to see inside and between them. Keep those landmarks in the same places across lessons. Use the [LSM record flow](../../../topics/lsm-tree/index.html#viewport) and the [shared design system](../../../design-system/README.md) as the layout reference.
 
 Give the builder the walkthrough, movement plan and stage copy alongside that sketch.
 
@@ -34,14 +34,14 @@ Give the builder the walkthrough, movement plan and stage copy alongside that sk
 - **A movement plan for the GSAP timeline.** Write one row per handoff between model states, including repeated steps within a stage and any different route in the variation. Identify the labeled key, record version or pointer that moves. Name its exact source, destination and path. Describe what stays at the source, what the learner sees during travel, and which fact the destination reveals on arrival. For a comparison that moves nothing, specify the values to highlight in place. Use the same labels and endpoints for the reduced-motion view.
 - **Popover copy for every stage, including input and result.** Give each a title, explain what the stage receives, which rule it applies and what it passes on or retains. Work through the actual values in one frame. Identify the values the builder must fill from the current run, the related article anchor, and what the popover says before that stage has run. A learner opening it early should still be able to make the lesson’s prediction.
 
-For example, the B+ tree lesson asks “Which key will the new leaf advertise to its parent?”
+For example, the LSM walkthrough asks which version of cedar a read returns after a flush.
 
 | Decision and trigger | Item and route | What the learner sees, in order |
 | --- | --- | --- |
-| Split the overflowing leaf | Records 35, 40 and 50 move from leaf B into the sorted rows of new leaf C. | Keep 20 and 30 in B. Let the learner follow 35 first, then 40 and 50. Show the resulting leaf link and leave the parent update for the next step. |
-| Choose the separator | A copy of C’s first key travels from its leaf row to the new separator in the root. | Keep record 35 visible in C as the copy travels. At arrival, show that the root now routes keys ≥ 35 to C. |
+| Flush the memtable | The current cedar record moves from the frozen memtable into a sorted file. | Show the write sequence on the row. Install the file before retiring the covered WAL entries. |
+| Read cedar | The lookup checks memory and then the sorted files. | Show each probe and the winning sequence beside the visible value. Keep the older on-disk version visible so the learner can compare them. |
 
-The root popover explains why equality follows the new pointer. Bind its boundary and the moving label to the new leaf’s first key so they agree when the input changes.
+The Version lookup inspector explains why the engine checked or skipped each source. Bind its labels to the current trace.
 
 Distinguish quantities the model computes from illustrative marks. Decide which details the overview needs, which a reader can inspect, and what should stay in view as the lesson advances. Transformer Explainer authors its long article separately from its guided pages. Each guided page identifies the diagram elements it needs when the reader enters and leaves. [Upstream lesson definitions](https://github.com/poloclub/transformer-explainer/blob/bfe50afba10b9b560b84143ee1107d977defa74f/src/utils/textbookPages.ts#L125-L185)
 

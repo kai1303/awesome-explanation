@@ -11,7 +11,7 @@ Use the manuscript from [design-explainer](../design-explainer/SKILL.md) as the 
 
 Trace its worked example on paper. For each decision, identify the input, relevant state before and after, rule, and observation that lets a learner verify the rule. Map each major article passage to a reachable diagram state. Keep the manuscript’s vocabulary, units, values, and simplifications. Resolve discrepancies against its primary sources before implementing.
 
-Use the design handoff’s stage sketch, movement plan and popover copy. If an older manuscript lacks them, derive them from its worked example. Build one wide, left-to-right chart with playback controls above it and the current lesson and operation trace below. Keep stage positions stable as the learner steps. Draw the actual structure inside each stage, such as linked leaves, and connect the specific entries involved in a handoff. On narrow screens, let the chart scroll horizontally and keep the active item in view. The [B+ tree chart](../../../topics/b-plus-tree/index.html#diagram) shows the layout.
+Use the design handoff’s stage sketch, movement plan and popover copy. If an older manuscript lacks them, derive them from its worked example. Build one wide, left-to-right chart. Place direct operations in the Client stage when the example accepts requests, with playback controls beside the operation. Put the current lesson and operation trace below. Keep stage positions stable as the learner steps. Draw the actual structure inside each stage, such as a sorted file and its Bloom filter, and connect the specific entries involved in a handoff. On narrow screens, let the chart scroll horizontally and keep the active item in view. The [LSM record flow](../../../topics/lsm-tree/index.html#viewport) shows the layout. Use the [shared design system](../../../design-system/README.md) for controls and chart styling.
 
 ## Implement the mechanism
 
@@ -47,4 +47,4 @@ Run the article’s example in the actual browser. Compare each distinct transfe
 
 Check a boundary, a wrong prediction and retry, previous/next, reset, and jumping directly from each passage to its unanswered question. On a narrow screen, follow the key across the chart and open its stage detail. With the keyboard, close the detail and continue from that step. State which cases you actually verified.
 
-Worked example: [B+ tree](../../../topics/b-plus-tree/index.html). Its default insertion splits a leaf. Changing the key can leave the tree’s shape intact. Both experiments use the same model to drive the picture and the explanation.
+Worked example: [LSM tree](../../../topics/lsm-tree/index.html). Follow two versions of cedar through memory and disk, then inspect which version a read returns.

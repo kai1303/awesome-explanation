@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { policies } from './compaction-planner.js';
 import { createRoot } from 'react-dom/client';
 import { exampleSQL, sqlVerbs } from './sql.js';
+import { CommandRow } from '../../design-system/controls.jsx';
 import { Button } from '@astryxdesign/core/Button';
 import { Selector } from '@astryxdesign/core/Selector';
 import '@astryxdesign/core/reset.css';
@@ -93,16 +94,16 @@ export function OperationBar({ run, reset, policy, comparison, switchPolicy, dem
     <div className="command-editor">
       <div className="client-group" role="group" aria-label="SQL queries">
         <p className="group-name">SQL · juniper</p>
-        {Object.keys(queryValues).map(id => <Button key={id} className="command-row"
-          label={sqlVerbs[id]} title={queryFor(id)} size="sm" variant="ghost" data-active={op === id}
+        {Object.keys(queryValues).map(id => <CommandRow key={id}
+          label={sqlVerbs[id]} title={queryFor(id)} active={op === id}
           isDisabled={busy || crashed} onClick={() => start(id)} />)}
       </div>
       <div className="client-group" role="group" aria-label="Engine operations">
         <p className="group-name">Engine</p>
-        {['flush', 'compact', crashed ? 'restart' : 'crash'].map(id => <Button key={id}
+        {['flush', 'compact', crashed ? 'restart' : 'crash'].map(id => <CommandRow key={id}
           ref={id === 'crash' || id === 'restart' ? recoveryRow : undefined}
-          className="command-row" label={id[0].toUpperCase() + id.slice(1)} size="sm" variant="ghost"
-          data-active={op === id} isDisabled={busy || (crashed && id !== 'restart')} onClick={() => start(id)} />)}
+          label={id[0].toUpperCase() + id.slice(1)}
+          active={op === id} isDisabled={busy || (crashed && id !== 'restart')} onClick={() => start(id)} />)}
       </div>
       {sql && <code className="command-sql">{sql}</code>}
       {playback && <div className="command-editor-actions">
@@ -142,12 +143,6 @@ export function OperationBar({ run, reset, policy, comparison, switchPolicy, dem
         <tbody><tr><td>{result.row.key}</td><td>{result.row.value}</td></tr></tbody></table>}
     </section>}
   </section>;
-}
-
-export function Disclosure({ label, expanded, controls, disabled, onClick, variant }) {
-  return <Button label={label} endContent={<span aria-hidden="true">{expanded ? '−' : '+'}</span>}
-    aria-expanded={expanded} aria-controls={controls} size="sm" variant={variant}
-    isDisabled={disabled} onClick={onClick} />;
 }
 
 export function KeyPaging({ page, pages, range, change }) {

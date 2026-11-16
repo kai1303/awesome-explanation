@@ -8,7 +8,7 @@
 </head>
 <body>
   <header class="toolbar">
-    <h1>Hash Table <em>Explainer</em></h1>
+    <h1 class="explainer-title">Hash Table <em>Explainer</em></h1>
     <div class="controls">
       <label for="scenario">Starting table</label>
       <select id="scenario"><option value="standard">Slot 3 empty</option><option value="wrap">Slot 3 holds 7</option></select>
@@ -16,15 +16,15 @@
       <button id="reset" aria-label="Restart this example" title="Restart this example">↺</button>
     </div>
   </header>
-  <main>
+  <main class="explainer-page">
     <section id="diagram" tabindex="-1" aria-label="Interactive linear probing diagram">
       <div class="chartbar"><div><strong>Linear probing</strong><span id="progress"></span></div>
-        <div class="legend"><span class="legend-key">Incoming key</span><span class="legend-hit">Collision</span><span class="legend-store">Stored</span></div></div>
-      <div class="canvas" tabindex="0" role="region" aria-label="Scrollable key flow">
+        <div class="legend"><span class="winner">Incoming key</span><span class="file">Collision</span><span class="ram">Stored</span></div></div>
+      <div class="flow-viewport" tabindex="0" role="region" aria-label="Scrollable key flow">
         <div id="board">
           <svg id="wires" aria-hidden="true"></svg>
           <section class="column"><h2><button data-stage="request">Request</button></h2><p>Key to insert</p>
-            <div class="mid"><div id="request" class="node"><small>Insert key</small><span id="origin" class="landing"></span></div></div>
+            <div class="mid"><div id="request" class="node winner"><small>Insert key</small><span id="origin" class="landing"></span></div></div>
           </section>
           <section class="column"><h2><button data-stage="hash">Home slot</button></h2><p>Integer hash</p>
             <div class="mid"><div id="hash" class="node"><small>Remainder</small><strong>17 mod 4</strong><div class="hash-answer"><span id="hash-target" class="landing"></span><span id="remainder"></span></div></div></div>
@@ -38,8 +38,8 @@
           <span id="traveler" aria-hidden="true">17</span>
         </div>
       </div>
-      <div class="chart-foot"><span id="path"></span><span>Select a stage or slot for details</span></div>
-      <div class="player">
+      <div class="footline"><span id="path"></span><span>Select a stage or slot for details</span></div>
+      <div class="notes">
         <div><small id="lesson-step"></small><h2 id="lesson-title"></h2><p id="caption" aria-live="polite"></p>
           <fieldset id="prediction"><legend id="question"></legend><div id="choices"></div><p id="feedback" role="status"></p></fieldset>
         </div>
@@ -50,7 +50,7 @@
       <div class="detail-heading"><h2 id="detail-title"></h2><button id="close" aria-label="Close explanation">×</button></div>
       <p id="detail-text"></p><p id="evidence"></p><a id="detail-link">Read the related passage ↓</a>
     </aside>
-    <article>
+    <article class="walkthrough">
       <h2 id="request-article">Why does key 17 end up in slot 3?</h2>
       <p>A hash table uses a key to work out where to start looking. Imagine inserting key 17 into a table with four slots numbered 0 through 3. Slot 1 holds 5 and slot 2 holds 6. Two slots are empty. Which one should receive 17 so we can find it again?</p>
       <p>This table stores distinct integer keys directly in its slots. For this example its size stays fixed, and no keys are deleted. We will compute a starting slot, inspect one slot at a time, and write 17 once.</p>

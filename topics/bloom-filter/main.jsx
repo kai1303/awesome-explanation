@@ -84,7 +84,7 @@ function App() {
   const stageKey = f.phase === 'empty' ? first : f.key;
   const owners = typeof detail === 'number' ? keys.slice(0,f.count).filter(k => positions(k).includes(detail)) : [];
   return <>
-    <header><h1>Bloom filter</h1>
+    <header><h1 className="explainer-title">Bloom Filter <em>Explainer</em></h1>
       <p>Have we seen this word before? A Bloom filter keeps a compact pattern of bits. Use it to test whether a word belongs to a set.</p></header>
     <p className="insertion-list"><strong>Words to insert</strong> <code>{keys.join(' · ')}</code>{file && <small>Example from {file}</small>}</p>
     <section id="diagram" aria-label="Interactive Bloom filter">
@@ -101,9 +101,9 @@ function App() {
         <Button size="sm" label="Next step" isDisabled={finished} onClick={() => seek(step+1)}/>
         <Button size="sm" variant="ghost" label="Reset" onClick={() => seek(0)}/>
       </div></div>
-      <BitFlow key={mode} querying={read} step={step} frame={f} stageKey={stageKey} action={action} inspecting={detail !== null}
+      <div className="flow-viewport" tabIndex={0} role="region" aria-label="Scrollable Bloom filter diagram"><BitFlow key={mode} querying={read} step={step} frame={f} stageKey={stageKey} action={action} detail={detail}
         evidence={done ? tested.map(i => 'bit ' + i + ' = ' + bitAt(f.bits, i)).join(' · ') : ''}
-        openDetail={openDetail}/>
+        openDetail={openDetail}/></div>
       <div className="lesson" aria-live="polite"><h2>{title}</h2><p>{caption}</p></div>
       {f.phase === 'probe' && <div className="predict"><span>Predict:</span>{['Definitely absent','Possibly present'].map((a,i) =>
         <Button size="sm" key={a} label={a} onClick={() => {play(false); if ((i === 0) === absent) seek(last);
@@ -112,7 +112,7 @@ function App() {
         <Button key={key} size="sm" variant={query === key ? 'secondary' : 'ghost'} label={key} onClick={() => {choose(key); seek(1);}}/>)}</div>
         <small>Use the same finished filter each time.</small></div>}
     </section>
-    <article>
+    <article className="walkthrough">
       <h2>How does a word become a bit position?</h2>
       <p>A hash function follows a fixed rule to turn an input into a number. This example mixes the letters of a word in order to produce one 32-bit number. A second rule uses parts of that number to select two positions between 0 and 15. Run the same word through both rules tomorrow and it will pick the same two positions.</p>
       <p>That repeatability lets Insert and Query find each other: Insert sets the two bits and Query reads them. Different words can still land on the same positions. This overlap is what makes a false positive possible.</p>

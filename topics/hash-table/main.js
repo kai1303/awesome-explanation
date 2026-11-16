@@ -174,7 +174,7 @@ function render(moving = false, follow = true) {
     const stored = done && i === f.index;
     const state = stored ? 'stored' : !visit ? '' : visit.resident === null ? 'available' : 'collision';
     const status = {stored:'Stored',collision:'Collision',available:'Empty found','':'Unchecked'}[state];
-    row.className = ['slot',state,f.index === i ? 'current' : ''].join(' ');
+    row.className = ['slot',state,state === 'collision' ? 'file' : state ? 'ram' : 'history',f.index === i ? 'current' : ''].join(' ');
     row.querySelector('.resident').textContent = f.slots[i] ?? '—';
     row.querySelector('.status').textContent = status;
     row.setAttribute('aria-label', 'Explain slot ' + i + ', ' + (f.slots[i] ?? 'empty') + ', ' + status);

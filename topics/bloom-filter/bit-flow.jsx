@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
+import { Disclosure } from '../../design-system/controls.jsx';
 import { gsap } from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 import { drawRibbon, reducedMotion } from '../chart-motion.js';
@@ -7,7 +8,7 @@ import { bitAt, slots } from './model.js';
 
 gsap.registerPlugin(MotionPathPlugin);
 
-export function BitFlow({querying, step, frame, stageKey, action, evidence, inspecting, openDetail}) {
+export function BitFlow({querying, step, frame, stageKey, action, evidence, detail, openDetail}) {
   const board = useRef(null);
   const previous = useRef({step, key:stageKey});
   const timeline = useRef(null);
@@ -59,8 +60,8 @@ export function BitFlow({querying, step, frame, stageKey, action, evidence, insp
   },[step,stageKey]);
 
   useLayoutEffect(() => {
-    if (inspecting) timeline.current?.progress(1);
-  },[inspecting]);
+    if (detail !== null) timeline.current?.progress(1);
+  },[detail]);
 
   function route(direction, order, from, to, label) {
     return <g key={direction + to + from} className={'route ' + direction}>
@@ -69,6 +70,11 @@ export function BitFlow({querying, step, frame, stageKey, action, evidence, insp
         <text textAnchor="middle" y="3">{label}</text></g>
     </g>;
   }
+  function stageTitle(name, label = name) {
+    return <Disclosure label={label} expanded={detail === name} aria-haspopup="dialog"
+      onClick={() => openDetail(name)} />;
+  }
+
   const slot = i => '[data-bit="' + i + '"]';
   return <div className="board" data-operation={querying ? 'query' : 'insert'} ref={board}>
     <svg className="wires" aria-hidden="true">
@@ -76,17 +82,17 @@ export function BitFlow({querying, step, frame, stageKey, action, evidence, insp
       {active.map((i, order) => route('in', order, '.hash-value', slot(i), 'bit ' + i))}
       {outgoing.map((i, order) => route('out', order, slot(i), '.verdict', 'bit ' + i))}
     </svg>
-    <div className="stage"><button className="stage-title" onClick={() => openDetail('Key')}>Key +</button>
+    <div className="stage">{stageTitle('Key')}
       <div className="stage-body"><span className="key-tag">{stageKey}</span></div></div>
-    <div className="stage"><button className="stage-title" onClick={() => openDetail('Hash')}>Hash function +</button>
+    <div className="stage">{stageTitle('Hash', 'Hash function')}
       <div className="stage-body"><code className="hash-value">{active.length ? '0x' + hash.toString(16).toUpperCase().padStart(8, '0') : '32-bit hash'}</code>
         <small>{active.length ? 'Positions ' + first + ' and ' + second : 'Maps the word to two positions'}</small></div></div>
-    <div className="stage array"><button className="stage-title" onClick={() => openDetail('Bit array')}>Bit array +</button>
+    <div className="stage array">{stageTitle('Bit array')}
       <div className="slots">{slots.map(i => <button key={i} data-bit={i}
-        className={'slot' + (bitAt(frame.bits,i) ? ' set':'') + (active.includes(i) ? ' active':'')}
+        className={'slot ' + (active.includes(i) ? 'winner active' : bitAt(frame.bits,i) ? 'ram' : 'history')}
         aria-label={'Bit ' + i + ', value ' + bitAt(frame.bits,i)} onClick={() => openDetail(i)}>
         <span>{i}</span><b>{bitAt(frame.bits,i)}</b></button>)}</div></div>
-    {querying && <div className="stage decision"><button className="stage-title" onClick={() => openDetail('Filter answer')}>Filter answer +</button>
+    {querying && <div className="stage decision">{stageTitle('Filter answer')}
       <div className="stage-body"><strong className="verdict">{action}</strong><small>{evidence}</small></div></div>}
   </div>;
 }

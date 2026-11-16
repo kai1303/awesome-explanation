@@ -1,0 +1,37 @@
+@import './explainer.css';
+
+.guide-nav, .guide { width: min(1080px, 100% - 2 * var(--gutter)); margin-inline: auto; }
+.guide-nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; border-bottom: 1px solid var(--line); gap: 12px; }
+.guide-nav nav { display: flex; flex-wrap: wrap; gap: clamp(10px, 3vw, 32px); }
+.guide a, .guide-nav a { color: var(--link); text-underline-offset: 3px; }
+.guide-nav a { font-size: 13px; text-decoration: none; }
+.guide-nav a:hover { text-decoration: underline; }
+.guide-nav .wordmark { color: var(--ink); font-size: 17px; font-weight: 750; letter-spacing: -.055em; }
+.guide { padding: clamp(32px, 6vw, 76px) 0 64px; }
+.guide h1 { margin: 0; font-size: clamp(34px, 5vw, 60px); line-height: 1.07; font-weight: 750; letter-spacing: -.06em; }
+.guide .intro { color: #556075; max-width: 64ch; margin: 16px 0 0; font-size: clamp(15px, 2vw, 18px); line-height: 1.55; }
+.guide > section { margin-top: 40px; scroll-margin: 20px; }
+.guide h2 { margin: 0; font-size: 22px; letter-spacing: -.045em; font-weight: 700; }
+.section-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.specimen { margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.specimen .chartbar, .specimen .footline { margin-inline: 20px; }
+.demo-board { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: clamp(42px, 9vw, 142px); min-width: 560px; padding: 22px 20px 28px; }
+.demo-board > svg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; pointer-events: none; }
+.demo-board path { stroke: var(--ribbon); stroke-width: 9px; opacity: .38; fill: none; }
+.demo-board h3 { font-size: 14px; font-weight: 600; line-height: 28px; margin: 0; }
+.demo-board .client-group, .sample-rows { margin-top: 20px; }
+.demo-detail { margin: 0 20px 14px; padding: 12px; background: #f5f2fa; line-height: 1.5; }
+.demo-detail p { margin: 5px 0 0; }
+#colors > p { color: var(--muted); line-height: 1.55; margin: 6px 0 16px; }
+.palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.palette strong, .palette code { display: block; margin-top: 5px; }
+.palette code { font: 11px var(--mono); color: var(--muted); }
+.sample { height: 54px; background: var(--light); border-left: 7px solid var(--fill); margin-bottom: 9px; }
+.usage { margin: 12px 0 0; }
+.usage > div { display: grid; grid-template-columns: minmax(110px, 1fr) 4fr; gap: 16px; border-top: 1px solid var(--line); padding: 14px 0; }
+.usage dt { font-weight: 600; }.usage dd { margin: 0; line-height: 1.55; max-width: 75ch; color: #556075; }
+@media (max-width: 580px) {
+  .guide-nav { align-items: flex-start; flex-direction: column; }
+  .palette { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .usage > div { grid-template-columns: 1fr; gap: 4px; }
+}
