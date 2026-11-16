@@ -12,7 +12,7 @@ An index of interactive explanations that grow into one connected diagram. Each 
 
 ## Databases
 
-- [Log-structured merge tree (LSM tree)](https://kai1303.github.io/awesome-explanation/) — Write two values for the same key and follow both versions through memory and disk to see which one a read returns.
+- [Log-structured merge tree (LSM tree)](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/) — Write two values for the same key and follow both versions through memory and disk to see which one a read returns.
 
 <details>
 <summary>Try it with the example key <code>cedar</code></summary>
@@ -32,6 +32,14 @@ Choose **Write** to try your own keys and values, or **Reset example** to return
 Have a question that belongs in the diagram? [Suggest an explanation](https://github.com/kai1303/awesome-explanation/issues/new) with the question, one interaction that would help someone answer it, and a concept it could connect to. For example, a filesystem journal could connect to the LSM tree through the question “What survives a crash?”
 
 To add a working explanation, open a pull request with a link under its topic and one sentence describing what readers can try. Add a topic heading and a Contents link when an explanation introduces a new subject.
+
+### Add an explanation
+
+Each explanation lives in `topics/<slug>/`. The slug is its URL, so use a name that can stay the same even if its category in this README changes.
+
+1. Create `topics/<slug>/index.html` and load the topic’s JavaScript with a relative module script. Keep its styles, simulation, and `*.test.js` files in that folder. The [LSM tree](topics/lsm-tree/) keeps its drawing code in `diagram/`.
+2. Link to the topic from this index. When two explanations share a concept, link directly from one topic page to the other using `../<other-slug>/`.
+3. Run `npm test` and `npm run build`. Tests and topic pages are discovered automatically. The existing Pages workflow publishes every built page.
 
 ## Run locally
 

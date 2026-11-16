@@ -1,5 +1,5 @@
 import { StorageEngine } from './engine.js';
-import { recordChart } from './chart.js';
+import { recordChart } from './diagram/chart.js';
 import './style.css';
 
 const $=selector=>document.querySelector(selector);

@@ -1,11 +1,11 @@
 {
-  "name": "storage-engine-explainer",
+  "name": "awesome-explanation",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --test engine.test.js"
+    "test": "node --test"
   },
   "dependencies": {
     "d3-selection": "^3.0.1",
