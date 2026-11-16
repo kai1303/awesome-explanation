@@ -1,10 +1,74 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>LSM Tree Explainer</title></head>
+<html lang="en" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>LSM Tree Explainer</title></head>
 <body>
-<header><h1>LSM Tree <em>Explainer</em></h1>
-<form id="command"><label>Operation<select id="op"><option value="write">Write</option><option value="read">Read</option><option value="flush">Flush</option><option value="compact">Compact</option></select></label><label id="keyLabel">Key<input id="key" value="cedar" maxlength="36" required></label><label id="valueLabel">Value<input id="value" value="teal" maxlength="48" required></label><button id="run">Run write <span aria-hidden="true">→</span></button></form><button id="reset">Reset example</button></header>
-<main><div class="chartbar"><div><strong>Record flow</strong><span>Follow a key across the engine.</span></div><div class="legend"><span class="log">WAL</span><span class="ram">Memory</span><span class="file">Disk</span><span class="winner">Visible</span></div></div>
-<div id="viewport" tabindex="0" aria-label="Scrollable record flow diagram"><div id="chart"><svg id="wires" aria-hidden="true"><defs></defs><g></g></svg></div></div>
-<div class="footline"><span id="instruction">Hover or focus a record to trace its key. Select a stage to expand it.</span><div id="paging" hidden><button id="prev" aria-label="Previous keys">‹</button><span id="page"></span><button id="next" aria-label="Next keys">›</button></div></div>
-<section class="notes"><div><h2 id="noteTitle">Reading the diagram</h2><p id="noteBody">Each ribbon follows one record version. The log preserves arrival order, the memtable sorts by key, and a read returns the first matching version from memory or disk.</p><p class="see">Chart adapted from <a href="https://github.com/poloclub/transformer-explainer">Transformer Explainer</a> · <a href="../../transformer-explainer-LICENSE.txt">MIT license</a></p></div><div><h2>Operation trace</h2><ol id="events" aria-live="polite"></ol></div></section></main>
+<main><h1>LSM Tree <em>Explainer</em></h1>
+<section hidden id="lesson" aria-label="Walkthrough player" tabindex="-1">
+  <div class="lesson-copy" aria-live="polite" aria-atomic="true"><span id="lesson-count"></span><p id="lesson-caption"></p></div>
+  <div class="lesson-controls">
+    <label>Chapter <select id="lesson-chapter"></select></label>
+    <button type="button" id="lesson-back">Back</button>
+    <button type="button" id="lesson-next">Next step</button>
+    <button type="button" id="lesson-reset">Start over</button>
+    <button type="button" id="sandbox-mode">Try your own operations</button>
+    <a id="lesson-read" href="#write">Read this passage ↓</a>
+  </div>
+</section>
+<div class="flow-pane"><div id="compare-four-files" tabindex="-1" hidden></div><div class="chartbar"><div><strong>Record flow</strong><span id="engine-status" role="status">Follow a key across the engine.</span></div><div class="legend"><span class="log">WAL</span><span class="ram">Memory</span><span class="file">Disk</span><span class="winner">Visible</span></div></div>
+<div id="policy-controls"></div>
+<p id="maintenance-status" title="Memtable size counts UTF-8 bytes in the current keys and values."></p>
+<div id="maintenance-frame" role="status" hidden><strong></strong><span></span></div>
+<div id="viewport" tabindex="0" aria-label="Scrollable record flow diagram"><div id="chart"><svg id="wires" aria-hidden="true"><defs></defs><g></g></svg>
+<section id="sandbox-controls" class="column client" aria-labelledby="client-title">
+<h2 id="client-title">Client</h2><p id="client-status" class="subtitle" role="status">SQL requests and results</p>
+<div id="operation-bar"></div>
+</section></div></div>
+<div class="footline"><span id="instruction">Hover a key to trace its path. Click a stage, record, or lookup cell to inspect it during playback.</span><div id="paging"></div></div>
+</div>
+<section class="notes"><div><h2 id="noteTitle">Reading the diagram</h2><p id="noteBody">Each ribbon follows one record version. The log preserves arrival order, the memtable sorts by key, and a read returns the matching version with the highest write sequence.</p><p class="see">Chart adapted from <a href="https://github.com/poloclub/transformer-explainer">Transformer Explainer</a> · <a href="../../transformer-explainer-LICENSE.txt">MIT license</a></p></div><div><h2>Operation trace</h2><ol id="events" aria-live="polite"></ol></div></section>
+<article class="walkthrough" aria-labelledby="how-it-works">
+  <h2 id="how-it-works">How does an LSM tree store two values for one key?</h2>
+  <p>Suppose you save <code>cedar = sage</code> and later change the value to <code>jade</code>. The diagram shows both values. How can the database answer a read while the old value is still on disk?</p>
+  <p>A log-structured merge tree (LSM tree) collects changes in memory so it can write many keys to disk together. Updating each key’s place on disk immediately would scatter a batch of writes across many locations. Batching lets the engine write ordered stretches of data. The price is that changes to the same key can end up in different places. Follow <code>cedar</code> through a write, a read, and a merge to see how the engine keeps those versions straight. The original paper describes this batching idea using a memory component and a rolling merge into a disk component. <a href="https://db.cs.berkeley.edu/cs286/papers/lsm-acta1996.pdf">O’Neil et al., section 2</a></p>
+
+  <h3 id="write">1. Write a value and keep a way to recover it</h3>
+  <p>Look at write #03 in the example’s history. The key is <code>cedar</code>, the value is <code>sage</code>, and the number records when this write arrived. The engine first appends the change to the <strong>write-ahead log</strong> (WAL). It then places the value in a table in memory called the <strong>memtable</strong>. A read can now find the value in RAM. If a crash clears RAM, the engine can replay the saved log entry. The history in the diagram lets you revisit old writes even after their log entries have been retired. <a href="https://github.com/facebook/rocksdb/wiki/Write-Ahead-Log-%28WAL%29">RocksDB on WAL recovery</a></p>
+  <a href="#lesson" data-lesson="write">Trace the first cedar write ↑</a>
+
+  <h3 id="mutations">Create, update, and delete a key</h3>
+  <p>In the Client stage, click <strong>INSERT</strong> to run <code>INSERT INTO records (key, value) VALUES ('juniper', 'needles');</code>. Step through the lookup first. If the key is absent, the engine appends a numbered record to the WAL and puts it in the memtable. Creating the same key again stops at the existence check.</p>
+  <p>Run <code>UPDATE records SET value = 'pine' WHERE key = 'juniper';</code>. Once the lookup finds the current key, the engine appends a newer version. A read now returns <code>pine</code>, even if an SSTable still contains <code>needles</code>.</p>
+  <p>Run <code>DELETE FROM records WHERE key = 'juniper';</code>. The engine appends a deletion marker called a <strong>tombstone</strong>. Run <code>SELECT * FROM records WHERE key = 'juniper';</code> to see why the tombstone yields zero rows. The WAL can replay the marker after a crash. A flush copies it to disk, and this sandbox retains the newest tombstone during compaction so an older file cannot bring the key back. Create the key again to give it a newer live version.</p>
+
+  <h3 id="first-flush">2. Flush a batch into a sorted file</h3>
+  <p>The first three writes arrived in the order <code>maple</code>, <code>birch</code>, <code>cedar</code>. Once the engine freezes that batch, it writes the records in key order instead: <code>birch</code>, <code>cedar</code>, <code>maple</code>. This produces <code>run-001.sst</code>, a sorted string table, or <strong>SSTable</strong>. Its contents stay fixed. Once the file is installed, the engine can retire the log entries it covers and reuse the memory. A second batch later fills another file. <a href="https://github.com/google/leveldb/blob/main/doc/impl.md">LevelDB’s description of logs and sorted tables</a></p>
+  <p>A database usually schedules a flush when a write pushes the memtable over its memory budget. New writes go into a fresh memtable while a background worker writes the frozen one to disk. In RocksDB, total memory pressure or a WAL that grows past its limit can trigger a flush earlier. The sandbox uses a small budget so you can cross it with a few writes. It counts the UTF-8 bytes in the current memtable keys and values. Click <strong>Pause</strong>, then <strong>Next step</strong> to follow the write into its automatic flush. <a href="https://github.com/facebook/rocksdb/wiki/MemTable#flush">RocksDB flush triggers</a></p>
+  <a href="#lesson" data-lesson="first-flush">Step through the first flush ↑</a>
+
+  <h3 id="update">3. Update the same key and follow a read</h3>
+  <p>Write #07 sets <code>cedar = jade</code>. It goes through the log and into the current memtable. The earlier file still holds <code>sage</code>. The operation controls open on the snapshot after write #08. <strong>Reset example</strong> restores that snapshot.</p>
+  <p>Follow the cedar read in the walkthrough below. Where can the engine stop? It checks memory first, finds #07, and returns <code>jade</code>. Every installed file in this example contains an earlier batch, so probing more files cannot turn up a later write. If memory misses, the engine tries the files from newest to oldest. For <code>maple</code>, the search passes through memory and the second file before it reaches the first.</p>
+  <p>Each SSTable in Read sources has a <strong>Bloom filter</strong>. When a flush or merge creates a file, every key in it sets two bits, including keys with tombstones. A read tests those same bits. One clear bit proves the key is absent and the engine skips the file. If both are set, the engine checks the rows. Other keys can set those bits too, so a possible match can still turn out to be absent. <a href="?demo=bloom">Watch the filters during a juniper read ↑</a> · <a href="../bloom-filter/">Build a Bloom filter step by step →</a></p>
+  <a href="#lesson" data-lesson="update">Follow the update and read ↑</a>
+
+  <h3 id="next-flush">4. Predict what the next flush will change</h3>
+  <p>If memory empties, will a read return <code>sage</code> again? Choose <strong>Engine → Flush</strong> in the Client stage, then use <strong>Pause</strong> and <strong>Next step</strong> to inspect each stage. The engine freezes the current batch, installs <code>run-003.sst</code> with <code>ash</code>, <code>cedar</code>, and <code>oak</code> in order, then retires the covered log. Read <code>cedar</code> again. Memory misses. The newest file supplies #07, so you get <code>jade</code> from disk. Both versions still exist.</p>
+  <a href="#lesson" data-lesson="next-flush">Trace the next flush and read ↑</a>
+
+  <h3 id="merge">5. Merge files and decide which version survives</h3>
+  <p>Choose <strong>Engine → Compact</strong>. Imagine reading the sorted inputs side by side, taking the smallest remaining key from any input. When you reach <code>cedar</code>, two records compete for one place in the output. The engine keeps #07 (<code>jade</code>) and drops #03 (<code>sage</code>). It installs the merged file, and later reads use that file. This example merges all installed files and serves only current values, so no reader needs #03.</p>
+  <p>Try a read for <code>juniper</code>, a key nobody wrote. After compaction, the engine can establish its absence by checking memory and one Bloom filter. Immediately after the flush in step 4, it consulted three file filters after the memory miss. That shorter search cost work up front: compaction read records and wrote a new file, even for keys such as <code>maple</code> whose value never changed.</p>
+  <a href="#lesson" data-lesson="merge">Compare the two versions ↑</a>
+
+  <h3 id="compaction-policies">When does compaction start, and which SSTables should merge?</h3>
+  <a href="#compare-four-files">Compare both policies on the same four files ↑</a>
+  <p>Each flush adds an SSTable. That new file can push a tier or level across its compaction threshold. The database can then queue a merge while foreground reads and writes continue. The sandbox shows the work in sequence and uses the selected policy to choose its input files. Switching policies shows the same commands under the other layout.</p>
+  <p><strong>Size-tiered compaction</strong> groups SSTables with similar sizes on disk. Cassandra’s size-tiered strategy normally waits for four files in a group. Four 64 MiB files can merge while an older 512 MiB file waits. This avoids repeatedly rewriting the large file with every flush, but both files may still contain versions of <code>cedar</code>. <a href="https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/stcs.html">Cassandra’s size-tiered strategy</a></p>
+  <p><strong>Leveled compaction</strong> organizes files into levels with increasing size budgets. In LevelDB, files in level 0 can overlap. A file-count threshold triggers compaction at level 0. In deeper levels, the trigger is a byte budget and the key ranges within each level are disjoint. Moving a file down means merging it with the overlapping files in the destination level. Rewriting those ranges costs writes, but a read for <code>juniper</code> can narrow its search to at most one candidate file in each deeper level. <a href="https://github.com/google/leveldb/blob/main/doc/impl.md#sorted-tables">LevelDB’s file layout</a></p>
+
+  <h3 id="crash-before">What if the engine crashes before the flush?</h3>
+  <p>Click <strong>Reset example</strong>, then choose <strong>Engine → Crash</strong>. Where is the surviving copy of <code>jade</code>? The memtable is gone. The installed table containing <code>cedar</code> still says <code>sage</code>. In this simulation the active WAL survives the crash. Click <strong>Restart</strong> to replay the WAL. The engine replays #06 (<code>oak</code>), #07 (<code>cedar</code>), and #08 (<code>ash</code>) in arrival order, rebuilding the memtable before serving reads. <span id="crash-after">Try the same crash immediately after a flush.</span> This time the log is empty. Predict which file will answer the next read for <code>cedar</code>, then check the operation trace.</p>
+  <a href="#lesson" data-lesson="crash-before">Crash before flushing ↑</a> · <a href="#lesson" data-lesson="crash-after">Crash after flushing ↑</a>
+</article>
+</main>
+<div id="stage-inspection"></div><div id="operation-inspections"></div><div id="bloom-inspection"></div>
 <script type="module" src="./main.js"></script></body></html>

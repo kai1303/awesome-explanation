@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hash Table Explainer · Linear probing</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <h1>Hash Table <em>Explainer</em></h1>
+    <div class="controls">
+      <label for="scenario">Starting table</label>
+      <select id="scenario"><option value="standard">Slot 3 empty</option><option value="wrap">Slot 3 holds 7</option></select>
+      <button id="run" class="primary">Run</button><button id="back">Back</button><button id="next">Step through</button>
+      <button id="reset" aria-label="Restart this example" title="Restart this example">↺</button>
+    </div>
+  </header>
+  <main>
+    <section id="diagram" tabindex="-1" aria-label="Interactive linear probing diagram">
+      <div class="chartbar"><div><strong>Linear probing</strong><span id="progress"></span></div>
+        <div class="legend"><span class="legend-key">Incoming key</span><span class="legend-hit">Collision</span><span class="legend-store">Stored</span></div></div>
+      <div class="canvas" tabindex="0" role="region" aria-label="Scrollable key flow">
+        <div id="board">
+          <svg id="wires" aria-hidden="true"></svg>
+          <section class="column"><h2><button data-stage="request">Request</button></h2><p>Key to insert</p>
+            <div class="mid"><div id="request" class="node"><small>Insert key</small><span id="origin" class="landing"></span></div></div>
+          </section>
+          <section class="column"><h2><button data-stage="hash">Home slot</button></h2><p>Integer hash</p>
+            <div class="mid"><div id="hash" class="node"><small>Remainder</small><strong>17 mod 4</strong><div class="hash-answer"><span id="hash-target" class="landing"></span><span id="remainder"></span></div></div></div>
+          </section>
+          <section class="column table-column"><h2><button data-stage="probe">Probe table</button></h2><p>Four slots in address order</p>
+            <div class="mid"><div id="rows"></div></div>
+          </section>
+          <section class="column"><h2><button data-stage="result">Insertion result</button></h2><p>Write to the table</p>
+            <div class="mid"><div id="receipt" class="node"><small id="receipt-label">Destination</small><strong id="destination"></strong><span id="count"></span></div></div>
+          </section>
+          <span id="traveler" aria-hidden="true">17</span>
+        </div>
+      </div>
+      <div class="chart-foot"><span id="path"></span><span>Select a stage or slot for details</span></div>
+      <div class="player">
+        <div><small id="lesson-step"></small><h2 id="lesson-title"></h2><p id="caption" aria-live="polite"></p>
+          <fieldset id="prediction"><legend id="question"></legend><div id="choices"></div><p id="feedback" role="status"></p></fieldset>
+        </div>
+        <div class="trace-note"><h2>Operation trace</h2><ol id="trace"></ol><a id="read">Read this passage ↓</a></div>
+      </div>
+    </section>
+    <aside id="stage-detail" popover="manual" role="dialog" aria-labelledby="detail-title">
+      <div class="detail-heading"><h2 id="detail-title"></h2><button id="close" aria-label="Close explanation">×</button></div>
+      <p id="detail-text"></p><p id="evidence"></p><a id="detail-link">Read the related passage ↓</a>
+    </aside>
+    <article>
+      <h2 id="request-article">Why does key 17 end up in slot 3?</h2>
+      <p>A hash table uses a key to work out where to start looking. Imagine inserting key 17 into a table with four slots numbered 0 through 3. Slot 1 holds 5 and slot 2 holds 6. Two slots are empty. Which one should receive 17 so we can find it again?</p>
+      <p>This table stores distinct integer keys directly in its slots. For this example its size stays fixed, and no keys are deleted. We will compute a starting slot, inspect one slot at a time, and write 17 once.</p>
+      <a href="#diagram" data-jump="request">Start with key 17 ↑</a>
+      <h3 id="hash-article">Find the home slot</h3>
+      <p>Divide 17 by 4. Four groups of four account for 16, leaving a remainder of 1. Our hash function uses that remainder as the <strong>home slot</strong>. Key 5 has the same remainder. When two different keys share a home slot, we have a collision.</p>
+      <a href="#diagram" data-jump="hash">Predict the first slot ↑</a>
+      <h3 id="probe-article">Inspect one neighbor at a time</h3>
+      <p>A <strong>probe</strong> is one inspection of a slot. At slot 1, compare the incoming 17 with the resident 5. They differ, so 5 stays where it is and we check slot 2. There we find 6. The same rule sends us to slot 3. This is linear probing. Each collision costs one more inspection, even though we computed the home slot only once.</p>
+      <a href="#diagram" data-jump="probe">Choose where to probe after slot 1 ↑</a>
+      <h3 id="store-article">Stop at the first empty slot</h3>
+      <p>Slot 3 is empty. Store 17 there. The insertion inspected three slots and changed one. A later lookup for 17 can start at slot 1 and repeat those comparisons until it finds the key in slot 3. In this table an empty slot also ends an unsuccessful lookup, because insertion would have used that slot before probing farther. <a href="https://opendatastructures.org/ods-java/5_2_LinearHashTable_Linear_.html">Open Data Structures on linear probing</a></p>
+      <a href="#diagram" data-jump="store">Inspect the table just before the write ↑</a>
+      <h3 id="wrap-article">What if slot 3 already holds 7?</h3>
+      <p>Try the second starting table. The home slot for 17 is still 1, but now the first three probes all meet a resident. Predict the next slot before advancing. The rule is to add one to the current address and take the remainder modulo four. At the end of the array, that arithmetic brings the probe back to the beginning.</p>
+      <a href="#diagram" data-jump="wrap">Try the wraparound decision ↑</a>
+    </article>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

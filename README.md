@@ -1,12 +1,13 @@
 # Awesome Explanation [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
 
-An index of interactive explanations that grow into one connected diagram. Each entry starts with a question you can explore by changing something and watching what happens. The LSM tree is the first topic. Its write-ahead log is one way the diagram can grow from databases into crash recovery and filesystems.
+Interactive explanations of data structures and database engines. Step through an operation, follow a key across the diagram, and click a stage to inspect the calculation behind it.
 
-**[Explore the live diagram](https://kai1303.github.io/awesome-explanation/)**
+**[Watch the Bloom filter hash each letter of juniper](https://kai1303.github.io/awesome-explanation/topics/bloom-filter/?mode=query&query=juniper#key-hash)**
 
 ## Contents
 
 - [Databases](#databases)
+- [Data structures](#data-structures)
 - [Contributing](#contributing)
 - [Run locally](#run-locally)
 
@@ -15,17 +16,21 @@ An index of interactive explanations that grow into one connected diagram. Each 
 - [Log-structured merge tree (LSM tree)](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/) — Write two values for the same key and follow both versions through memory and disk to see which one a read returns.
 
 <details>
-<summary>Try it with the example key <code>cedar</code></summary>
+<summary>Try a lookup, a merge, or crash recovery</summary>
 
-The example opens after eight writes and two flushes. The key `cedar` has been written twice. Try these operations in order to see what happens to both versions.
-
-1. Choose **Read**, leave the key as `cedar`, and run it. The read finds `jade` in the memtable and stops. Hover over or focus a `cedar` record to trace it across the diagram and find the older `sage` version on disk.
-2. Run **Flush**. Watch the engine freeze the memtable, install its sorted records in a new disk table, and retire the write-ahead log. Read `cedar` again. You still get `jade`, this time from disk.
-3. Run **Compact**. Follow both versions of `cedar` into the merge. The new table keeps `jade` and drops `sage`. A read returns the same value even though there is now only one copy of the key.
-
-Choose **Write** to try your own keys and values, or **Reset example** to return to the starting state. The simulation runs in your browser.
+- [Follow a juniper lookup](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/?demo=bloom). Inspect each SSTable’s Bloom filter to see why the engine skips one file and checks another.
+- [Compare compaction policies](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/?demo=juniper). Switch between size-tiered and leveled compaction to see which files each policy merges for the same writes.
+- In the Client column, click a SQL row to run it. Click **Crash** before a flush, then **Restart** to watch the write-ahead log rebuild the memtable.
 
 </details>
+
+- [B+ tree](https://kai1303.github.io/awesome-explanation/topics/b-plus-tree/) — Insert 35, follow a leaf split, and scan the linked leaves for keys from 30 through 42.
+
+## Data structures
+
+- [Bloom filter](https://kai1303.github.io/awesome-explanation/topics/bloom-filter/) — Insert words into a bit array and test set membership. In **Insert**, follow each word to the two bits it sets. In **Query**, compare `juniper` (inserted), `cedar` (definitely absent), and `teak` (a false positive). Click **Hash function** to watch the running hash change with each letter. For `juniper`, the final hash is `0x3F20DCD0` and selects bits 0 and 13.
+
+- [Hash table with linear probing](https://kai1303.github.io/awesome-explanation/topics/hash-table/) — Follow key 17 past two occupied slots, then fill the last slot to see the probe wrap around.
 
 ## Contributing
 
@@ -34,6 +39,10 @@ Have a question that belongs in the diagram? [Suggest an explanation](https://gi
 To add a working explanation, open a pull request with a link under its topic and one sentence describing what readers can try. Add a topic heading and a Contents link when an explanation introduces a new subject.
 
 ### Add an explanation
+
+Use the repository skill [design-explainer](.agents/skills/design-explainer/SKILL.md) to research the mechanism and write the article readers will see alongside the diagram. The [LSM tree walkthrough](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/#how-it-works) follows one key from its first write through a flush, a merge, and crash recovery.
+
+Then use [build-explainer](.agents/skills/build-explainer/SKILL.md) with that article to build the interactive diagram. For example, the [B+ tree](topics/b-plus-tree/index.html) connects each passage to a step you can inspect, rewind, or repeat with another key.
 
 Each explanation lives in `topics/<slug>/`. The slug is its URL, so use a name that can stay the same even if its category in this README changes.
 
@@ -52,6 +61,6 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. Run `npm test` for the storage engine tests or `npm run build` to create the static site in `dist/`.
+Open the local URL printed by Vite. Run `npm test` for the topic tests or `npm run build` to create the static site in `dist/`.
 
 The ribbon chart adapts work from the Polo Club of Data Science’s [Transformer Explainer](https://github.com/poloclub/transformer-explainer). See the [upstream MIT license](public/transformer-explainer-LICENSE.txt).

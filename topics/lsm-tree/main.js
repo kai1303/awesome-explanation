@@ -1,14 +1,33 @@
-import { StorageEngine } from './engine.js';
+import { newLookup, trackProbe } from './bloom.js';
+import { policies, sandboxLimits } from './compaction-planner.js';
+import { conditionalWrites } from './engine.js';
+import { articleEngine, articleFrames } from './walkthrough.js';
+import { BloomInspector } from './diagram/bloom-inspector.jsx';
 import { recordChart } from './diagram/chart.js';
+import { mountControl, OperationBar } from './controls.jsx';
+import { FourFileMerge } from './diagram/four-file-merge.jsx';
 import './style.css';
 
 const $=selector=>document.querySelector(selector);
 const overview=[$('#noteTitle').textContent,$('#noteBody').textContent];
+const showBloom = mountControl($('#bloom-inspection'), BloomInspector);
+let inspectingBloom = false;
 const chart=recordChart($('#chart'),stage=>{
   $('#noteTitle').textContent=stage?.[0]??overview[0];
   $('#noteBody').textContent=stage?.[2]??overview[1];
+}, (table, lookup, restoreFocus) => {
+  inspectingBloom = true;
+  if (!guided) refreshControls();
+  showBloom({table, lookup, close:() => {
+    inspectingBloom = false;
+    showBloom(null);
+    if (!guided) refreshControls();
+    requestAnimationFrame(restoreFocus);
+  }});
 });
-let engine, busy=false;
+let engine, layouts, comparison;
+let policy = 'tiered';
+const juniperDemo = new URLSearchParams(location.search).get('demo');
 const names={client:'Client',wal:'Write-ahead log',mem:'Memtable',disk:'SSTables'};
 const stageFor={client:'history',wal:'route',mem:'sources',disk:'sources'};
 
@@ -18,55 +37,217 @@ function trace(label,text) {
   li.append(title, document.createTextNode(text));
   $('#events').append(li); $('#events').scrollTop=$('#events').scrollHeight;
 }
-function selectOperation() {
-  const op=$('#op').value;
-  for(const [id,show] of [['key',op==='write'||op==='read'],['value',op==='write']]) {
-    $('#'+id+'Label').hidden=!show; $('#'+id).disabled=!show;
-  }
-  $('#run').firstChild.textContent='Run '+op+' ';
+function showThresholds() {
+  const l0 = engine.tables.filter(t => t.level === 0).length;
+  const threshold = policy === 'tiered' ? 'Merge at 4 files in one size tier' : `L0 · ${l0}/4 files · L1 budget 128 B`;
+  $('#maintenance-status').textContent =
+    `Auto flush · ${engine.memtableBytes}/${sandboxLimits.memtableBytes} B in RAM　 ${threshold}`;
 }
-function reset() {
-  engine=new StorageEngine();
-  for(const batch of [
-    [['maple','red'],['birch','gold'],['cedar','sage']],
-    [['elm','olive'],['birch','amber']],
-    [['oak','umber'],['cedar','jade'],['ash','silver']]
-  ]) {
-    for(const [key,value] of batch) Array.from(engine.write(key,value));
-    if(engine.seq<=5) Array.from(engine.flush());
-  }
-  $('#op').value='write';$('#key').value='cedar';$('#value').value='teal';
-  selectOperation();chart.reset();chart.render(engine);
-  $('#events').replaceChildren();
-  trace('Example','Eight writes, two flushes. Read “cedar” to see why jade wins over sage.');
-}
-$('#op').onchange=()=>{
-  selectOperation();
-  chart.inspectOperation($('#op').value,'next');
-};
-$('#reset').onclick=reset;
-$('#command').onsubmit=async e=>{
-  e.preventDefault(); if(busy)return;
-  const op=$('#op').value, key=$('#key').value, value=$('#value').value;
-  const pause=()=>matchMedia('(prefers-reduced-motion: reduce)').matches?Promise.resolve():new Promise(done=>setTimeout(done,620));
-  const controls=[...document.querySelectorAll('header button, header select, header input:not(:disabled)')];
-  busy=true;controls.forEach(c=>c.disabled=true);$('#events').replaceChildren();
-  try {
-    if(op==='write'||op==='read') chart.inspectOperation(op);
-    for(const step of engine[op](key,value)) {
-      chart.render(engine,{stage:stageFor[step.node],key:op==='read'||op==='write'?key:null,seq:op==='write'?engine.seq:null,source:step.source});
-      if(step.flush) chart.showFlushStep(step);
-      else if(op==='flush') chart.inspectOperation('flush','next');
-      trace(names[step.node],step.text);await pause();
+
+function reset(demo = false) {
+  layouts = {};
+  comparison = null;
+  for (const id of Object.keys(policies)) {
+    layouts[id] = articleEngine({seedJuniper:demo === 'bloom'});
+    layouts[id].policy = id;
+    if (demo === 'juniper' || demo === 'bloom') {
+      Array.from(layouts[id].runSandbox('flush'));
     }
-    if(op==='compact') chart.inspectOperation('compact','last');
+    if (demo === 'juniper') {
+      Array.from(layouts[id].runSandbox('write','ash','silver'));
+      Array.from(layouts[id].runSandbox('write','cedar','jade'));
+    }
+  }
+  engine = layouts[policy];
+  showThresholds();
+  $('#engine-status').textContent='Follow a key across the engine.';
+  chart.reset();chart.render(engine);
+  if (demo === 'bloom') {
+    const viewport = $('#viewport');
+    viewport.scrollLeft = Math.min($('#body-sources').parentElement.offsetLeft - 16, viewport.scrollWidth - viewport.clientWidth);
+  }
+  $('#events').replaceChildren();
+  if (demo === 'bloom') trace('Juniper','Follow the filters across three SSTables to find juniper.');
+  else if (demo === 'juniper') trace('Juniper','Three files on disk. Writing juniper fills the memtable and triggers a flush, then a merge.');
+  else trace('Example','Eight writes, two flushes. Cedar has two versions. Select INSERT to add juniper.');
+  refreshControls(demo === 'bloom' ? 'read' : demo === 'juniper' ? 'create' : null);
+}
+function* run(op, key, value, sql) {
+  const previousSeq = engine.seq;
+  const conditional = conditionalWrites.includes(op);
+  let lookup = op === 'read' || conditional ? newLookup(key) : null;
+  const merges = [];
+  let maintenance = null;
+  $('#events').replaceChildren();
+  $('#engine-status').textContent = 'Follow a key across the engine.';
+  const command = sql ? sql.split(/\s+/)[0].toUpperCase() : op[0].toUpperCase() + op.slice(1);
+  if (sql) trace('SQL',sql);
+  const [target, destination] = {
+    flush:['sources','Memtable'], compact:['sources','SSTables'], crash:['sources','Memtable'],
+    restart:['route','WAL'], write:['history','Write history']
+  }[op] ?? ['lookup','Version lookup'];
+  yield chart.clientExchange(target,false,`${command} → ${destination}`);
+  try {
+    for(const step of engine.runSandbox(op,key,value)) {
+      showThresholds();
+      const activeOp = step.automatic ?? op;
+      if (conditional && step.record) lookup = null;
+      if (!maintenance && (conditional || op === 'read')) $('#engine-status').textContent = step.text;
+      if(op==='crash') $('#engine-status').textContent='Engine offline. Restart to replay the surviving WAL.';
+      if(activeOp==='restart') $('#engine-status').textContent=step.text;
+      if (step.plan && step.phase==='install') merges.push(step.plan);
+      if (lookup) trackProbe(lookup, step);
+      if (activeOp === 'flush' || activeOp === 'compact') {
+        maintenance = {...step, operation:activeOp, trigger:step.reason ?? (maintenance?.operation === activeOp ? maintenance.trigger : null)};
+      }
+      let stage = stageFor[step.node];
+      let location = step.source ?? names[step.node];
+      if (step.node === 'client') {
+        stage = lookup ? 'lookup' : step.record ? 'history' : null;
+        location = lookup ? 'Version lookup' : step.record ? 'Write history' : 'Client';
+      }
+      const action = step.automatic ?? command;
+      const installation = chart.render(engine,{clientStatus:`${action} · ${location}`,stage,key:step.record?.key ?? (activeOp==='read'||activeOp==='write'||conditionalWrites.includes(activeOp)?key:null),seq:step.record?.seq ?? (activeOp==='write'?engine.seq:null),source:step.source, replay:step.record},lookup,maintenance);
+      if (step.reason) trace('Threshold reached',step.reason);
+      trace(names[step.node],step.text);yield installation;
+    }
     if(op==='read'){
-      const winner=engine.memory.get(key) ?? engine.tables.flatMap(t=>t.rows).find(r=>r.key===key);
-      chart.render(engine,{stage:'lookup',key,winningSeq:winner?.seq}); await pause();
-      chart.render(engine,{stage:'output',key}); await pause();
+      lookup.complete = true;
+      chart.render(engine,{clientStatus:`${command} · Version lookup`,stage:'lookup',key,winningSeq:lookup.winner?.seq},lookup); yield;
+      chart.render(engine,{clientStatus:`${command} · Visible values`,stage:'output',key},lookup); yield;
+    }
+    // Both layouts receive the user's commands; each schedules its own maintenance.
+    const other = policy === 'tiered' ? 'leveled' : 'tiered';
+    const otherMerges = [];
+    for (const step of layouts[other].runSandbox(op,key,value)) {
+      if (step.plan && step.phase === 'install') otherMerges.push(step.plan);
+    }
+    if (merges.length || otherMerges.length || op === 'compact') {
+      comparison = {command:op === 'delete' ? `Delete ${key}` : (conditional || op === 'write') ? `${op[0].toUpperCase()+op.slice(1)} ${key} = ${value}` : op, seq:engine.seq,
+        [policy]:merges, [other]:otherMerges};
+      refreshControls();
+    }
+    if (sql) {
+      let result;
+      if (op === 'read') {
+        const row = lookup.winner?.operation === 'delete' ? null : lookup.winner;
+        result = {sql, row, message:row ? '1 row returned' : '0 rows returned'};
+      } else if (op === 'create' && engine.seq === previousSeq) {
+        result = {sql, message:'Duplicate primary key. Insert rejected.'};
+      } else {
+        result = {sql, message:engine.seq === previousSeq ? '0 rows affected' : '1 row affected'};
+      }
+      const source = op === 'read' ? 'output' : engine.seq === previousSeq ? 'lookup' : 'sources';
+      trace('Client', result.message);
+      yield chart.clientExchange(source,true,result.message);
+      return result;
     }
   } finally {
-    chart.render(engine);controls.forEach(c=>c.disabled=false);busy=false;
+    chart.render(engine,null,lookup,maintenance);
   }
-};
-reset();
+}
+const frames = articleFrames();
+const chapterSelect = $('#lesson-chapter');
+const firstFrame = new Map();
+for (const [index, frame] of frames.entries()) {
+  if (firstFrame.has(frame.chapter)) continue;
+  firstFrame.set(frame.chapter, index);
+  const label = frame.chapter === 'crash-after' ? 'Crash after flushing' : document.getElementById(frame.chapter).textContent;
+  chapterSelect.add(new Option(label, frame.chapter));
+}
+
+let position = 0;
+let guided;
+const showControls = mountControl($('#operation-bar'), OperationBar);
+
+function refreshControls(demo = false) {
+  showControls({run, reset, policy, comparison, switchPolicy, demo, inspectingBloom});
+}
+
+function switchPolicy(id) {
+  if (policy === id) return;
+  policy = id;
+  engine = layouts[id];
+  chart.reset();
+  const last = comparison?.[id].at(-1);
+  chart.render(engine, null, null, last && engine.status === 'online' ? {
+    operation:'compact', phase:'install', plan:last, text:last.reason
+  } : null);
+  $('#engine-status').textContent = engine.status === 'online' ? 'Follow a key across the engine.' : 'Engine offline. Restart to replay the surviving WAL.';
+  showThresholds();
+  $('#events').replaceChildren();
+  trace(policies[id], `Same writes through #${engine.seq}. ${engine.tables.length} installed SSTables.`);
+  refreshControls();
+}
+
+function showFrame(index) {
+  position = index;
+  const frame = frames[index];
+  chapterSelect.value = frame.chapter;
+  $('#lesson-count').textContent = 'Step ' + (index + 1) + ' of ' + frames.length;
+  $('#lesson-caption').textContent = frame.caption;
+  $('#lesson-read').href = '#' + frame.chapter;
+  $('#lesson-back').disabled = index === 0;
+  $('#lesson-next').disabled = index === frames.length - 1;
+  $('#engine-status').textContent = { online:'Engine online', crashed:'Engine offline', recovering:'Replaying WAL' }[frame.engine.status];
+  chart.showFrame(frame);
+  const stage = $('#chart .playing');
+  if (stage) {
+    for (const row of stage.querySelectorAll('[data-key]')) {
+      if (row.dataset.key === frame.highlight.key) row.classList.add('lesson-focus');
+    }
+    const viewport = $('#viewport');
+    if (viewport.scrollWidth > viewport.clientWidth) viewport.scrollLeft = stage.offsetLeft - 16;
+  }
+  $('#events').replaceChildren();
+  let start = index;
+  while (start > 0 && frames[start - 1].chapter === frame.chapter) start--;
+  for (const past of frames.slice(start, index + 1)) trace('Step', past.caption);
+}
+
+function setGuided(on) {
+  if (on === guided) return;
+  const firstVisit = guided === undefined;
+  guided = on;
+  $('#lesson').hidden = !on;
+  $('#maintenance-status').hidden = on;
+  $('#sandbox-controls').hidden = on;
+  if (on) {
+    showControls(null);
+    chart.reset();
+    showFrame(position);
+  } else {
+    reset(firstVisit && juniperDemo);
+  }
+}
+
+$('#lesson-back').onclick = () => showFrame(position - 1);
+$('#lesson-next').onclick = () => showFrame(position + 1);
+$('#lesson-reset').onclick = () => showFrame(0);
+chapterSelect.onchange = () => showFrame(firstFrame.get(chapterSelect.value));
+$('#sandbox-mode').onclick = () => setGuided(false);
+for (const link of document.querySelectorAll('[data-lesson]')) {
+  link.onclick = () => {
+    position = firstFrame.get(link.dataset.lesson);
+    if (guided) showFrame(position);
+    else setGuided(true);
+    $('#lesson').focus();
+  };
+}
+setGuided(false);
+
+const mergeHost = $('#compare-four-files');
+const showFourFiles = mountControl(mergeHost, FourFileMerge);
+function syncFourFileLesson() {
+  const open = location.hash === '#compare-four-files';
+  const wasOpen = !mergeHost.hidden;
+  mergeHost.hidden = !open;
+  showFourFiles(open ? {} : null);
+  if (open) mergeHost.focus();
+  else if (wasOpen && location.hash === '#policy-controls') {
+    if (guided) setGuided(false);
+    requestAnimationFrame(() => $('#policy-controls .four-file-link')?.focus());
+  }
+}
+window.addEventListener('hashchange',syncFourFileLesson);
+syncFourFileLesson();
