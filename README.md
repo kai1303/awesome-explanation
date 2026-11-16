@@ -13,7 +13,7 @@ Interactive explanations of data structures and database engines. Step through a
 
 ## Databases
 
-- [Log-structured merge tree (LSM tree)](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/) — Write two values for the same key and follow both versions through memory and disk to see which one a read returns.
+- [Log-structured merge tree (LSM tree)](https://kai1303.github.io/awesome-explanation/topics/lsm-tree/)
 
 <details>
 <summary>Try a lookup, a merge, or crash recovery</summary>
@@ -24,7 +24,7 @@ Interactive explanations of data structures and database engines. Step through a
 
 </details>
 
-- [B+ tree](https://kai1303.github.io/awesome-explanation/topics/b-plus-tree/) — Insert 35, follow a leaf split, and scan the linked leaves for keys from 30 through 42.
+- [B+ tree](https://kai1303.github.io/awesome-explanation/topics/b-plus-tree/)
 
 ## Data structures
 
